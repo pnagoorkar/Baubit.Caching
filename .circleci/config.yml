@@ -1,0 +1,283 @@
+version: 2.1
+
+#======================================= Workflows =======================================
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build:
+          dotnet_solution_folder: "<YOUR_SOLUTION_NAME>"
+          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          context:
+            - Context_Prashant
+          filters:
+            tags:
+              ignore: /.*/ #ignore any builds triggered by tags
+
+      - test:
+          requires:
+            - build
+          dotnet_solution_folder: "<YOUR_SOLUTION_NAME>"
+          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          context:
+            - Context_Prashant
+          filters:
+            tags:
+              ignore: /.*/ #ignore any builds triggered by tags
+
+      - pack_and_publish:
+          requires:
+            - test
+          dotnet_solution_folder: "<YOUR_SOLUTION_NAME>"
+          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          context:
+            - Context_Prashant
+          filters:
+            tags:
+              ignore: /.*/ #ignore any builds triggered by tags
+            branches:
+              only:
+                - master
+
+      - release:
+          requires:
+            - test
+          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          context:
+            - Context_Prashant
+          filters:
+            tags:
+              ignore: /.*/ #ignore any builds triggered by tags
+            branches:
+              only:
+                - release
+#======================================= End Workflows ===================================
+jobs:
+#======================================= Build ====================================
+
+  build:
+    parameters:
+      dotnet_solution_folder:
+        type: string
+        default: ""
+      dotnet_project_name:
+        type: string
+        default: ""
+    docker:
+      - image: $DOCKER_HUB_USERNAME/baubit:base
+        auth:
+            username: $DOCKER_HUB_USERNAME
+            password: $DOCKER_HUB_PASSWORD
+    steps:
+      - run:
+          name: Parameter check
+          command: |
+              # Check all parameters are passed
+              if [ -z "<< parameters.dotnet_solution_folder >>" ]; then
+                echo "dotnet_solution_folder must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export SOLUTION_FOLDER="<< parameters.dotnet_solution_folder >>"
+              fi
+
+              if [ -z "<< parameters.dotnet_project_name >>" ]; then
+                echo "dotnet_project_name must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export PROJECT_NAME="<< parameters.dotnet_project_name >>"
+              fi
+
+              echo "export SOLUTION_FOLDER=$SOLUTION_FOLDER" >> "$BASH_ENV"
+              echo "export PROJECT_NAME=$PROJECT_NAME" >> "$BASH_ENV"
+      - checkout
+          
+      - run:
+          name: Add github as a nuget package source
+          command: nuget_add_github
+          
+      - run:
+          name: Build
+          command: dotnet_sign_and_build
+
+#======================================= End Build ====================================
+
+#======================================= Test ====================================
+  test:
+    parameters:
+      dotnet_solution_folder:
+        type: string
+        default: ""
+      dotnet_project_name:
+        type: string
+        default: ""
+    machine:
+      image: ubuntu-2204:current
+    steps:
+      - run:
+          name: Parameter check
+          command: |
+              # Check all parameters are passed
+              if [ -z "<< parameters.dotnet_solution_folder >>" ]; then
+                echo "dotnet_solution_folder must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export SOLUTION_FOLDER="<< parameters.dotnet_solution_folder >>"
+              fi
+
+              if [ -z "<< parameters.dotnet_project_name >>" ]; then
+                echo "dotnet_project_name must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export PROJECT_NAME="<< parameters.dotnet_project_name >>"
+              fi
+
+              echo "export SOLUTION_FOLDER=$SOLUTION_FOLDER" >> "$BASH_ENV"
+              echo "export PROJECT_NAME=$PROJECT_NAME" >> "$BASH_ENV"
+      - checkout
+
+      # Uncomment if you need xUnit Testcontainers support
+      #- run: docker version
+      #- run: docker info
+  
+      # Install .NET SDK (fast, no sudo/repos needed)
+      - run: |
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+          bash dotnet-install.sh --channel 9.0
+          echo 'export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"' >> "$BASH_ENV"
+      - run: dotnet --info
+          
+      - run:
+          name: Test
+          command: |
+            SOLUTION_FILE="${SOLUTION_FOLDER}.sln"                
+            dotnet test ${SOLUTION_FILE} \
+              --collect:"XPlat Code Coverage" \
+              --results-directory ./TestResults/ \
+              -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - run:
+          name: Upload Coverage to Codecov
+          command: |
+            # Find the coverage file (it's typically in a subdirectory with a GUID)
+            COVERAGE_FILE=$(find ./TestResults -name "coverage.opencover.xml" | head -n 1)
+            
+            if [ -z "$COVERAGE_FILE" ]; then
+              echo "Coverage file not found!"
+              exit 1
+            fi
+            
+            echo "Found coverage file: $COVERAGE_FILE"
+            
+            # Construct dynamic token variable name
+            # Replace dots with underscores for CircleCI context variable naming
+            PROJECT_NAME_SAFE=$(echo "$PROJECT_NAME" | tr '.' '_')
+            TOKEN_VAR_NAME="CODECOV_TOKEN_${PROJECT_NAME_SAFE}"
+            
+            # Use variable indirection to get the token value
+            CODECOV_TOKEN="${!TOKEN_VAR_NAME}"
+            
+            if [ -z "$CODECOV_TOKEN" ]; then
+              echo "Error: ${TOKEN_VAR_NAME} is not set in the CircleCI context!"
+              exit 1
+            fi
+            
+            # Dynamically construct repository slug
+            REPO_SLUG="${GITHUB_USERNAME}/${PROJECT_NAME}"
+            
+            # Download and run Codecov uploader
+            curl -Os https://uploader.codecov.io/latest/linux/codecov
+            chmod +x codecov
+            ./codecov \
+              -t ${CODECOV_TOKEN} \
+              -f ${COVERAGE_FILE} \
+              -r ${REPO_SLUG} \
+              -b ${CIRCLE_BUILD_NUM} \
+              -C ${CIRCLE_SHA1} \
+              -B ${CIRCLE_BRANCH}
+
+#======================================= End Test ====================================
+
+#======================================= PackAndPublish ====================================
+  pack_and_publish:
+    parameters:
+      dotnet_solution_folder:
+        type: string
+        default: ""
+      dotnet_project_name:
+        type: string
+        default: ""
+    docker:
+      - image: $DOCKER_HUB_USERNAME/baubit:base
+        auth:
+            username: $DOCKER_HUB_USERNAME
+            password: $DOCKER_HUB_PASSWORD
+    steps:
+      - run:
+          name: Parameter check
+          command: |
+              # Check all parameters are passed
+              if [ -z "<< parameters.dotnet_solution_folder >>" ]; then
+                echo "dotnet_solution_folder must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export SOLUTION_FOLDER="<< parameters.dotnet_solution_folder >>"
+              fi
+
+              if [ -z "<< parameters.dotnet_project_name >>" ]; then
+                echo "dotnet_project_name must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export PROJECT_NAME="<< parameters.dotnet_project_name >>"
+              fi
+
+              echo "export SOLUTION_FOLDER=$SOLUTION_FOLDER" >> "$BASH_ENV"
+              echo "export PROJECT_NAME=$PROJECT_NAME" >> "$BASH_ENV"
+      - checkout
+
+      - run:
+          name: Check for ignored files
+          command: check_for_processable_changes
+          
+      - run:
+          name: Add github as a nuget package source
+          command: nuget_add_github
+          
+      - run:
+          name: Build
+          command: dotnet_sign_and_build
+
+      - run:
+          name: Pack_and_publish
+          command: pack_and_publish_signed
+#======================================= End PackAndPublish ====================================
+
+#======================================= Release =========================================
+  release:
+    parameters:
+      dotnet_project_name:
+        type: string
+        default: ""
+    docker:
+      - image: $DOCKER_HUB_USERNAME/baubit:base
+        auth:
+            username: $DOCKER_HUB_USERNAME
+            password: $DOCKER_HUB_PASSWORD
+    steps:
+      - run:
+          name: Parameter check
+          command: |
+              # Check all parameters are passed
+              if [ -z "<< parameters.dotnet_project_name >>" ]; then
+                echo "dotnet_project_name must be passed as a parameter!"
+                circleci-agent step halt
+              else
+                export PROJECT_NAME="<< parameters.dotnet_project_name >>"
+              fi
+              echo "export PROJECT_NAME=$PROJECT_NAME" >> "$BASH_ENV"
+
+      - checkout
+
+      - run:
+          name: Publish_to_nuget_org
+          command: publish_to_nuget_org
+#======================================= End Release =====================================

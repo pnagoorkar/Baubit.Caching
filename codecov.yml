@@ -1,0 +1,13 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%  # Require minimum 80% overall coverage
+        threshold: 0%
+        informational: false
+
+ignore:
+  - "Baubit.Identity.Tests/**"  # Exclude test project from coverage calculations
+  - "**/*.Tests/**"              # Extra safety for any test patterns
+  - "**/obj/**"                  # Ignore build artifacts
+  - "**/bin/**"
