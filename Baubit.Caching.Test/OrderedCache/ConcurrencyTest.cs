@@ -651,9 +651,12 @@ namespace Baubit.Caching.Test.OrderedCache
                             case 2: // GetNext
                                 cache.GetNextOrDefault(null, out _);
                                 break;
-                            case 3: // Update
-                                if (!addedIds.IsEmpty && addedIds.TryPeek(out var id))
+                            case 3: // Update - safe concurrent access
+                                if (!addedIds.IsEmpty && addedIds.TryTake(out var id))
+                                {
                                     cache.Update(id, $"updated-{j}");
+                                    addedIds.Add(id); // Put it back for other threads
+                                }
                                 break;
                             case 4: // GetLast
                                 cache.GetLastOrDefault(out _);

@@ -69,10 +69,10 @@ namespace Baubit.Caching.Test.OrderedCache
             using var cache = CreateTestCache();
             cache.Add("test", out _);
 
-            // Act
+            // Act - Passing null ID returns true (operation succeeded) with null entry (not found)
             var result = cache.GetEntryOrDefault(null, out var entry);
 
-            // Assert
+            // Assert - API design: returns true for successful operation, entry is null when not found
             Assert.True(result);
             Assert.Null(entry);
         }
@@ -321,10 +321,10 @@ namespace Baubit.Caching.Test.OrderedCache
             // Arrange
             using var cache = CreateTestCache();
 
-            // Act
+            // Act - Non-existent GUID returns true (operation succeeded) with null entry (not found)
             var result = cache.GetNextOrDefault(Guid.NewGuid(), out var entry);
 
-            // Assert
+            // Assert - API design: returns true for successful operation, entry is null when not found
             Assert.True(result);
             Assert.Null(entry);
         }
