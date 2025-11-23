@@ -1,0 +1,18 @@
+[submodule "SubModules/Baubit.Collections"]
+	path = SubModules/Baubit.Collections
+	url = https://github.com/pnagoorkar/Baubit.Collections.git
+[submodule "SubModules/Baubit.Identity"]
+	path = SubModules/Baubit.Identity
+	url = https://github.com/pnagoorkar/Baubit.Identity.git
+[submodule "SubModules/Baubit.Configuration"]
+	path = SubModules/Baubit.Configuration
+	url = https://github.com/pnagoorkar/Baubit.Configuration.git
+[submodule "SubModules/Baubit.Reflection"]
+	path = SubModules/Baubit.Reflection
+	url = https://github.com/pnagoorkar/Baubit.Reflection.git
+[submodule "SubModules/Baubit.Traceability"]
+	path = SubModules/Baubit.Traceability
+	url = https://github.com/pnagoorkar/Baubit.Traceability.git
+[submodule "SubModules/Baubit.Validation"]
+	path = SubModules/Baubit.Validation
+	url = https://github.com/pnagoorkar/Baubit.Validation.git
