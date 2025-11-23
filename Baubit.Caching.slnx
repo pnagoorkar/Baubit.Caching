@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="Baubit.Caching.Test/Baubit.Caching.Test.csproj" Id="653cb460-791c-43d5-99db-984b7325b714" />
   <Project Path="Baubit.Caching/Baubit.Caching.csproj" />
 </Solution>
