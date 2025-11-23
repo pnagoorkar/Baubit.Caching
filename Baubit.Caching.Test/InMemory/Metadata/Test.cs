@@ -359,22 +359,34 @@
         }
 
         [Fact]
-        public void Metadata_ResetRoomCount_ReturnsAndResets()
+        public async Task Metadata_ResetRoomCount_ReturnsAndResets()
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata { Configuration = new Caching.Configuration { RunAdaptiveResizing = true } };
-            var waitingRoom = new WaitingRoom<Guid>();
-            var joinTask = waitingRoom.Join();
-
-            // Add entries to trigger room counting
+            
+            // Add first entry
             var id1 = Guid.NewGuid();
             metadata.AddTail(id1);
+
+            // Start an async wait (this will join the waiting room)
+            var nextIdTask = metadata.GetNextIdAsync(id1, CancellationToken.None);
+            
+            // Give the task a moment to register in the waiting room
+            await Task.Delay(10);
+            
+            // Add second entry while there's a waiter - this should increment room count
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id2);
+            
+            // Wait for the async operation to complete
+            await nextIdTask;
 
             // Act
             var count = metadata.ResetRoomCount();
             var secondCount = metadata.ResetRoomCount();
 
             // Assert
+            Assert.Equal(1, count); // Should have counted 1 room entry
             Assert.Equal(0, secondCount); // Should be reset to 0
         }
 
