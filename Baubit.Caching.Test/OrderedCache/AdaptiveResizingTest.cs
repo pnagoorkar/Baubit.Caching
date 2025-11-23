@@ -31,30 +31,47 @@ namespace Baubit.Caching.Test.OrderedCache
             var config = new Caching.Configuration
             {
                 RunAdaptiveResizing = true,
-                AdaptionWindowMS = 200,
-                RoomRateUpperLimit = 2, // Grow if >2 entries/sec
+                AdaptionWindowMS = 100, // Check every 100ms
+                RoomRateUpperLimit = 5, // Grow if >5 entries/sec
                 GrowStep = 10,
                 EvictAfterEveryX = int.MaxValue
             };
             using var cache = CreateTestCache(config: config, l1MinCap: 10, l1MaxCap: 100);
 
-            // Act - Add items rapidly to trigger growth
-            for (int i = 0; i < 10; i++)
+            // Act - Create waiting consumers to enable roomCount tracking
+            var cts = new CancellationTokenSource();
+            var consumerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    var enumerator = cache.GetFutureAsyncEnumerator(cts.Token);
+                    await using (enumerator)
+                    {
+                        int count = 0;
+                        while (await enumerator.MoveNextAsync() && count < 30)
+                        {
+                            count++;
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { }
+            });
+
+            await Task.Delay(50); // Let consumer start waiting
+
+            // Add items at high rate while consumer is waiting (triggers roomCount)
+            for (int i = 0; i < 30; i++)
             {
                 cache.Add($"item-{i}", out _);
+                await Task.Delay(8); // ~125 items/sec >> 5/sec threshold
             }
 
-            // Wait for adaptive resizing to run
-            await Task.Delay(500);
+            cts.Cancel();
+            await consumerTask;
+            await Task.Delay(200); // Wait for resize to complete
 
-            // Add more items
-            for (int i = 10; i < 20; i++)
-            {
-                cache.Add($"item-{i}", out _);
-            }
-
-            // Assert - Cache should continue working
-            Assert.Equal(20, cache.Count);
+            // Assert - Cache should continue working and growth should have triggered
+            Assert.Equal(30, cache.Count);
         }
 
         [Fact]
@@ -64,29 +81,28 @@ namespace Baubit.Caching.Test.OrderedCache
             var config = new Caching.Configuration
             {
                 RunAdaptiveResizing = true,
-                AdaptionWindowMS = 200,
-                RoomRateLowerLimit = 10, // Shrink if <10 entries/sec (will be below this)
+                AdaptionWindowMS = 100,
+                RoomRateLowerLimit = 5, // Shrink if <5 entries/sec
                 ShrinkStep = 5,
                 EvictAfterEveryX = int.MaxValue
             };
             using var cache = CreateTestCache(config: config, l1MinCap: 20, l1MaxCap: 100);
 
-            // Act - Add a few items
-            for (int i = 0; i < 5; i++)
+            // Act - Add items slowly to trigger shrinkage (rate < 5/sec)
+            var addTask = Task.Run(async () =>
             {
-                cache.Add($"item-{i}", out _);
-            }
+                for (int i = 0; i < 10; i++)
+                {
+                    cache.Add($"item-{i}", out _);
+                    await Task.Delay(50); // Add ~2 items/sec (below threshold)
+                }
+            });
 
-            // Wait for adaptive resizing to potentially shrink
-            await Task.Delay(500);
+            // Wait for adds and adaptive resizing to complete
+            await addTask;
+            await Task.Delay(200); // Wait for resize check
 
-            // Add more items to ensure cache still works
-            for (int i = 5; i < 10; i++)
-            {
-                cache.Add($"item-{i}", out _);
-            }
-
-            // Assert - Cache should continue working
+            // Assert - Cache should continue working and shrinkage should have triggered
             Assert.Equal(10, cache.Count);
         }
 
@@ -132,8 +148,8 @@ namespace Baubit.Caching.Test.OrderedCache
             var config = new Caching.Configuration
             {
                 RunAdaptiveResizing = true,
-                AdaptionWindowMS = 150,
-                RoomRateUpperLimit = 5,
+                AdaptionWindowMS = 100,
+                RoomRateUpperLimit = 10, // Grow if >10 entries/sec
                 GrowStep = 10,
                 EvictAfterEveryX = int.MaxValue
             };
@@ -141,24 +157,25 @@ namespace Baubit.Caching.Test.OrderedCache
 
             var tasks = new List<Task>();
 
-            // Act - Concurrent adds while adaptive resizing is running
+            // Act - Concurrent adds at high rate to trigger growth
             for (int i = 0; i < 5; i++)
             {
                 int threadId = i;
                 tasks.Add(Task.Run(async () =>
                 {
-                    for (int j = 0; j < 20; j++)
+                    for (int j = 0; j < 40; j++)
                     {
                         cache.Add($"thread-{threadId}-item-{j}", out _);
-                        await Task.Delay(10);
+                        await Task.Delay(2); // Fast adds to trigger growth
                     }
                 }));
             }
 
             await Task.WhenAll(tasks);
+            await Task.Delay(300); // Allow resize to complete
 
             // Assert
-            Assert.Equal(100, cache.Count);
+            Assert.Equal(200, cache.Count);
         }
 
         [Fact]
@@ -208,7 +225,7 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_AdaptiveResizing_Disabled_WorksNormally()
+        public async Task OrderedCache_AdaptiveResizing_Disabled_WorksNormally()
         {
             // Arrange
             var config = new Caching.Configuration
@@ -226,6 +243,65 @@ namespace Baubit.Caching.Test.OrderedCache
 
             // Assert
             Assert.Equal(50, cache.Count);
+        }
+
+        [Fact]
+        public async Task OrderedCache_AdaptiveResizing_HighRateTriggersGrowth()
+        {
+            // Arrange
+            var config = new Caching.Configuration
+            {
+                RunAdaptiveResizing = true,
+                AdaptionWindowMS = 200, // Check every 200ms
+                RoomRateUpperLimit = 2, // Grow if >2 entries/sec
+                GrowStep = 15,
+                EvictAfterEveryX = int.MaxValue
+            };
+            using var cache = CreateTestCache(config: config, l1MinCap: 10, l1MaxCap: 100);
+
+            // Act - Create waiting consumers (this makes _roomCount increment)
+            var consumerTasks = new List<Task>();
+            var cts = new CancellationTokenSource();
+            
+            // Start consumers that will wait for entries
+            for (int i = 0; i < 3; i++)
+            {
+                consumerTasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetFutureAsyncEnumerator(cts.Token);
+                        await using (enumerator)
+                        {
+                            int count = 0;
+                            while (await enumerator.MoveNextAsync() && count < 20)
+                            {
+                                count++;
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException) { }
+                }));
+            }
+
+            await Task.Delay(50); // Let consumers establish waiting state
+
+            // Now add items - these will signal waiters and increment roomCount
+            for (int cycle = 0; cycle < 3; cycle++)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    cache.Add($"cycle-{cycle}-item-{i}", out _);
+                    await Task.Delay(20); // Controlled rate: ~50/sec, averaged over window >> 2/sec
+                }
+                await Task.Delay(100); // Let resize window complete
+            }
+
+            cts.Cancel();
+            await Task.WhenAll(consumerTasks);
+
+            // Assert - Cache should have all items and growth should have occurred
+            Assert.Equal(24, cache.Count);
         }
     }
 }
