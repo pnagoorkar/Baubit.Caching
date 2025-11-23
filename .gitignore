@@ -48,6 +48,10 @@ CodeCoverage/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
+# Coverage Results
+CoverageReport/
+TestResults/
+
 # NUnit
 *.VisualState.xml
 TestResult.xml
