@@ -63,7 +63,7 @@ namespace Baubit.Caching.Test.OrderedCache
             for (int i = 0; i < 30; i++)
             {
                 cache.Add($"item-{i}", out _);
-                await Task.Delay(8); // ~125 items/sec >> 5/sec threshold
+                await Task.Delay(8); // ~125 items/sec >> 5/sec threshold (RoomRateUpperLimit)
             }
 
             cts.Cancel();
@@ -292,7 +292,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 for (int i = 0; i < 8; i++)
                 {
                     cache.Add($"cycle-{cycle}-item-{i}", out _);
-                    await Task.Delay(20); // Controlled rate: ~50/sec, averaged over window >> 2/sec
+                    await Task.Delay(20); // ~50 items/sec >> 2/sec threshold (RoomRateUpperLimit)
                 }
                 await Task.Delay(100); // Let resize window complete
             }
