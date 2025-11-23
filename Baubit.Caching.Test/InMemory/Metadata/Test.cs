@@ -5,5 +5,391 @@
     /// </summary>
     public class Test
     {
+        [Fact]
+        public void Metadata_Constructor_InitializesEmpty()
+        {
+            // Arrange & Act
+            var metadata = new Caching.InMemory.Metadata();
+
+            // Assert
+            Assert.Equal(0, metadata.Count);
+            Assert.Null(metadata.HeadId);
+            Assert.Null(metadata.TailId);
+            Assert.NotNull(metadata.CurrentOrder);
+            Assert.NotNull(metadata.IdNodeMap);
+        }
+
+        [Fact]
+        public void Metadata_AddTail_FirstEntry_SetsHeadAndTail()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id = Guid.NewGuid();
+
+            // Act
+            var result = metadata.AddTail(id);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(1, metadata.Count);
+            Assert.Equal(id, metadata.HeadId);
+            Assert.Equal(id, metadata.TailId);
+        }
+
+        [Fact]
+        public void Metadata_AddTail_MultipleEntries_MaintainsOrder()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+            var id3 = Guid.NewGuid();
+
+            // Act
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+            metadata.AddTail(id3);
+
+            // Assert
+            Assert.Equal(3, metadata.Count);
+            Assert.Equal(id1, metadata.HeadId);
+            Assert.Equal(id3, metadata.TailId);
+        }
+
+        [Fact]
+        public void Metadata_ContainsKey_ExistingId_ReturnsTrue()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id = Guid.NewGuid();
+            metadata.AddTail(id);
+
+            // Act
+            var result = metadata.ContainsKey(id);
+
+            // Assert
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void Metadata_ContainsKey_NonExistingId_ReturnsFalse()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id = Guid.NewGuid();
+
+            // Act
+            var result = metadata.ContainsKey(id);
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_NullId_ReturnsHead()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+
+            // Act
+            var result = metadata.GetNextId(null, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(id1, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_HeadId_ReturnsSecond()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+
+            // Act
+            var result = metadata.GetNextId(id1, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(id2, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_TailId_ReturnsNull()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+
+            // Act - Use the actual TailId from metadata
+            var result = metadata.GetNextId(metadata.TailId, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_IdSmallerThanHead_ReturnsHead()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            var smallerId = Guid.Parse("05000000-0000-0000-0000-000000000000");
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+
+            // Act
+            var result = metadata.GetNextId(smallerId, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(id1, nextId);
+        }
+
+        [Fact]
+        public async Task Metadata_GetNextIdAsync_WhenNoNext_WaitsForNew()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            metadata.AddTail(id1);
+
+            // Act
+            var nextIdTask = metadata.GetNextIdAsync(id1, CancellationToken.None);
+            
+            // Add after a small delay
+            await Task.Delay(50);
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id2);
+
+            var nextId = await nextIdTask;
+
+            // Assert
+            Assert.Equal(id2, nextId);
+        }
+
+        [Fact]
+        public async Task Metadata_GetNextIdAsync_WhenNextExists_ReturnsImmediately()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+
+            // Act
+            var nextId = await metadata.GetNextIdAsync(id1, CancellationToken.None);
+
+            // Assert
+            Assert.Equal(id2, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GenerateNextId_FirstCall_ReturnsNewId()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+
+            // Act
+            var result = metadata.GenerateNextId(out var id);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotEqual(Guid.Empty, id);
+        }
+
+        [Fact]
+        public void Metadata_GenerateNextId_SubsequentCalls_GenerateIncreasingIds()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            metadata.GenerateNextId(out var id1);
+            metadata.AddTail(id1);
+
+            // Act
+            var result = metadata.GenerateNextId(out var id2);
+
+            // Assert
+            Assert.True(result);
+            Assert.True(id2 > id1);
+        }
+
+        [Fact]
+        public void Metadata_Remove_ExistingId_Success()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+
+            // Act
+            var result = metadata.Remove(id1);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(1, metadata.Count);
+            Assert.False(metadata.ContainsKey(id1));
+            Assert.Equal(id2, metadata.HeadId);
+        }
+
+        [Fact]
+        public void Metadata_Remove_NonExistingId_ReturnsFalse()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id = Guid.NewGuid();
+
+            // Act
+            var result = metadata.Remove(id);
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void Metadata_Remove_LastEntry_SetsHeadAndTailToNull()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id = Guid.NewGuid();
+            metadata.AddTail(id);
+
+            // Act
+            var result = metadata.Remove(id);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(0, metadata.Count);
+            Assert.Null(metadata.HeadId);
+            Assert.Null(metadata.TailId);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_EmptyStore_ReturnsEmpty()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id = Guid.NewGuid();
+
+            // Act
+            var result = metadata.GetIdsThrough(id, out var ids);
+
+            // Assert
+            Assert.False(result);
+            Assert.Empty(ids);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_IdBeforeHead_ReturnsEmpty()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            var smallerId = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            metadata.AddTail(id1);
+
+            // Act
+            var result = metadata.GetIdsThrough(smallerId, out var ids);
+
+            // Assert
+            Assert.False(result);
+            Assert.Empty(ids);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_IdAtTail_ReturnsAllIds()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+            metadata.AddTail(id3);
+
+            // Act
+            var result = metadata.GetIdsThrough(id3, out var ids);
+
+            // Assert
+            Assert.True(result);
+            var idArray = ids.ToArray();
+            Assert.Equal(3, idArray.Length);
+            Assert.Equal(id1, idArray[0]);
+            Assert.Equal(id2, idArray[1]);
+            Assert.Equal(id3, idArray[2]);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_MiddleId_ReturnsPartialList()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+            metadata.AddTail(id3);
+
+            // Act
+            var result = metadata.GetIdsThrough(id2, out var ids);
+
+            // Assert
+            Assert.True(result);
+            var idArray = ids.ToArray();
+            Assert.Equal(2, idArray.Length);
+            Assert.Equal(id1, idArray[0]);
+            Assert.Equal(id2, idArray[1]);
+        }
+
+        [Fact]
+        public void Metadata_ResetRoomCount_ReturnsAndResets()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata { Configuration = new Caching.Configuration { RunAdaptiveResizing = true } };
+            var waitingRoom = new WaitingRoom<Guid>();
+            var joinTask = waitingRoom.Join();
+            
+            // Add entries to trigger room counting
+            var id1 = Guid.NewGuid();
+            metadata.AddTail(id1);
+
+            // Act
+            var count = metadata.ResetRoomCount();
+            var secondCount = metadata.ResetRoomCount();
+
+            // Assert
+            Assert.Equal(0, secondCount); // Should be reset to 0
+        }
+
+        [Fact]
+        public void Metadata_Dispose_CompletesSuccessfully()
+        {
+            // Arrange
+            var metadata = new Caching.InMemory.Metadata();
+            metadata.AddTail(Guid.NewGuid());
+
+            // Act
+            metadata.Dispose();
+
+            // Assert - No exception thrown
+            Assert.Equal(1, metadata.Count); // Data should still be present after dispose
+        }
     }
 }
