@@ -24,7 +24,7 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id = Guid.NewGuid();
+            metadata.GenerateNextId(out var id);
 
             // Act
             var result = metadata.AddTail(id);
@@ -41,13 +41,13 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
-            var id3 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
+            metadata.AddTail(id1);
+            metadata.GenerateNextId(out var id2);
+            metadata.AddTail(id2);
+            metadata.GenerateNextId(out var id3);
 
             // Act
-            metadata.AddTail(id1);
-            metadata.AddTail(id2);
             metadata.AddTail(id3);
 
             // Assert
@@ -61,7 +61,7 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id = Guid.NewGuid();
+            metadata.GenerateNextId(out var id);
             metadata.AddTail(id);
 
             // Act
@@ -76,7 +76,7 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id = Guid.NewGuid();
+            metadata.GenerateNextId(out var id);
 
             // Act
             var result = metadata.ContainsKey(id);
@@ -90,9 +90,9 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
             // Act
@@ -108,9 +108,9 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
             // Act
@@ -126,9 +126,9 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
             // Act - Use the actual TailId from metadata
@@ -163,15 +163,27 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
 
+            // Use a TaskCompletionSource to ensure the async wait is properly started
+            var waitStarted = new TaskCompletionSource<bool>();
+            
             // Act
-            var nextIdTask = metadata.GetNextIdAsync(id1, CancellationToken.None);
+            var nextIdTask = Task.Run(async () =>
+            {
+                var task = metadata.GetNextIdAsync(id1, CancellationToken.None);
+                waitStarted.SetResult(true);
+                return await task;
+            });
 
-            // Add after a small delay
-            await Task.Delay(50);
-            var id2 = Guid.NewGuid();
+            // Wait for the async operation to actually start and register in the waiting room
+            await waitStarted.Task;
+            
+            // Add a small delay to ensure Join() has been called and _numOfGuests incremented
+            await Task.Delay(100);
+            
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
             var nextId = await nextIdTask;
@@ -185,9 +197,9 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
             // Act
@@ -232,9 +244,9 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
             // Act
@@ -252,7 +264,7 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id = Guid.NewGuid();
+            metadata.GenerateNextId(out var id);
 
             // Act
             var result = metadata.Remove(id);
@@ -266,7 +278,7 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id = Guid.NewGuid();
+            metadata.GenerateNextId(out var id);
             metadata.AddTail(id);
 
             // Act
@@ -284,7 +296,7 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            var id = Guid.NewGuid();
+            metadata.GenerateNextId(out var id);
 
             // Act
             var result = metadata.GetIdsThrough(id, out var ids);
@@ -365,7 +377,7 @@
             var metadata = new Caching.InMemory.Metadata { Configuration = new Caching.Configuration { RunAdaptiveResizing = true } };
             
             // Add first entry
-            var id1 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
 
             // Start an async wait (this will join the waiting room)
@@ -375,7 +387,7 @@
             await Task.Delay(10);
             
             // Add second entry while there's a waiter - this should increment room count
-            var id2 = Guid.NewGuid();
+            metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
             
             // Wait for the async operation to complete
@@ -395,7 +407,8 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata();
-            metadata.AddTail(Guid.NewGuid());
+            metadata.GenerateNextId(out var id);
+            metadata.AddTail(id);
 
             // Act
             metadata.Dispose();
