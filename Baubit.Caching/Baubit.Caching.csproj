@@ -18,8 +18,8 @@
     <SignAssembly>$(SignAssembly)</SignAssembly>
     <AssemblyOriginatorKeyFile>$(KeyFilePath)</AssemblyOriginatorKeyFile>
     <EmitCompilerGeneratedFiles>false</EmitCompilerGeneratedFiles>
-    <Description>TBD</Description>
-    <PackageTags>TBD</PackageTags>
+    <Description>Thread-safe insertion-ordered cache with O(1) lookups, two-tier storage (bounded L1, unbounded L2), and async enumeration. Provides deletion-resilient iteration, automatic multi-consumer memory management, and zero-latency producer-consumer coordination using GuidV7 time-ordered identifiers. Ideal for event sourcing, audit logs, message queues, and time-series caching scenarios.</Description>
+    <PackageTags>cache;ordered-cache;async-enumeration;event-sourcing;audit-log;time-series;guidv7;producer-consumer;two-tier-cache;fifo;insertion-order;thread-safe;message-queue;change-data-capture;baubit</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
