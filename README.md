@@ -419,7 +419,6 @@ var config = new Configuration { EvictAfterEveryX = 100 };
 
 - Every 100 `Add` operations, evicts entries **before** the slowest active enumerator
 - Prevents unbounded memory growth when consumers lag behind producers
-- Disabled by setting `EvictAfterEveryX = int.MaxValue`
 
 **Configuration Options:**
 ```csharp
