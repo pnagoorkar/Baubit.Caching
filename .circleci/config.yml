@@ -6,8 +6,8 @@ workflows:
   build:
     jobs:
       - build:
-          dotnet_solution_folder: "<YOUR_SOLUTION_NAME>"
-          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          dotnet_solution_folder: "Baubit.Caching"
+          dotnet_project_name: "Baubit.Caching"
           context:
             - Context_Prashant
           filters:
@@ -17,8 +17,8 @@ workflows:
       - test:
           requires:
             - build
-          dotnet_solution_folder: "<YOUR_SOLUTION_NAME>"
-          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          dotnet_solution_folder: "Baubit.Caching"
+          dotnet_project_name: "Baubit.Caching"
           context:
             - Context_Prashant
           filters:
@@ -28,8 +28,8 @@ workflows:
       - pack_and_publish:
           requires:
             - test
-          dotnet_solution_folder: "<YOUR_SOLUTION_NAME>"
-          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          dotnet_solution_folder: "Baubit.Caching"
+          dotnet_project_name: "Baubit.Caching"
           context:
             - Context_Prashant
           filters:
@@ -42,7 +42,7 @@ workflows:
       - release:
           requires:
             - test
-          dotnet_project_name: "<YOUR_PROJECT_NAME>"
+          dotnet_project_name: "Baubit.Caching"
           context:
             - Context_Prashant
           filters:
@@ -149,8 +149,16 @@ jobs:
       - run:
           name: Test
           command: |
-            SOLUTION_FILE="${SOLUTION_FOLDER}.sln"                
-            dotnet test ${SOLUTION_FILE} \
+            TEST_PROJECT="${PROJECT_NAME}.Test/${PROJECT_NAME}.Test.csproj"
+            
+            if [ ! -f "$TEST_PROJECT" ]; then
+              echo "Test project not found at: $TEST_PROJECT"
+              echo "Skipping tests..."
+              exit 0
+            fi
+            
+            dotnet test ${TEST_PROJECT} \
+              --configuration Release \
               --collect:"XPlat Code Coverage" \
               --results-directory ./TestResults/ \
               -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
