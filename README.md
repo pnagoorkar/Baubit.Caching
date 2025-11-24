@@ -4,7 +4,41 @@
 [![codecov](https://codecov.io/gh/pnagoorkar/Baubit.Caching/branch/master/graph/badge.svg)](https://codecov.io/gh/pnagoorkar/Baubit.Caching)
 [![NuGet](https://img.shields.io/nuget/v/Baubit.Caching.svg)](https://www.nuget.org/packages/Baubit.Caching/)
 
-Thread-safe ordered cache for .NET 9 with O(1) lookups, two-tier storage, and async enumeration.
+Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
+
+**In 30 seconds:** `OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID). You can:
+- fetch any entry by ID in O(1),
+- walk entries in chronological order,
+- `await foreach` future entries with zero polling,
+- safely evict entries once all consumers have passed them.
+
+**Use it for:** event sourcing, CDC pipelines, audit logs, FIFO-ish queues with random access, time-series buffering.  
+**Don’t use it for:** generic key/value caching, TTL caches.
+## Table of Contents
+
+- [Installation](#installation)
+- [Why?](#why)
+  - [TL;DR](#tldr)
+  - [Detailed Motivations](#detailed-motivations)
+- [Core Concepts](#core-concepts)
+- [Architecture](#architecture)
+- [API Reference](#api-reference)
+- [Usage](#usage)
+  - [Basic Setup](#basic-setup)
+  - [Write Operations](#write-operations)
+  - [Read Operations](#read-operations)
+  - [Async Enumeration](#async-enumeration)
+  - [Multi-Consumer Streaming](#multi-consumer-streaming)
+- [Configuration](#configuration)
+  - [Adaptive Resizing](#adaptive-resizing)
+  - [Eviction](#eviction)
+- [Performance](#performance)
+- [Thread Safety](#thread-safety)
+- [Use Cases](#use-cases)
+- [Gotchas / FAQ](#gotchas--faq)
+- [Roadmap](#roadmap)
+- [Benchmarks](#benchmarks)
+- [License](#license)
 
 ## Installation
 
@@ -14,7 +48,17 @@ dotnet add package Baubit.Caching
 
 ## Why?
 
-### 1. Time-Ordered Identity Without Dual Fields
+### TL;DR
+
+1. **Time-ordered IDs**: GuidV7 eliminates separate timestamp fields
+2. **Transparent tiering**: L1/L2 fallback is invisible to consumers
+3. **Deletion-resilient iteration**: Removing entries mid-stream doesn't break enumeration
+4. **Memory safety**: Automatic eviction behind slowest consumer prevents leaks
+5. **Zero-latency streaming**: Consumers resume instantly when producers add entries (no polling)
+
+### Detailed Motivations
+
+#### 1. Time-Ordered Identity Without Dual Fields
 
 Event sourcing and audit logs need both unique IDs and timestamps:
 
@@ -30,9 +74,9 @@ public record Event(Guid Id, DateTime Timestamp, string Data);
 public record Event(Guid Id, string Data); // Id is naturally chronological
 ```
 
-### 2. Transparent Multi-Tier Cache
+#### 2. Transparent Multi-Tier Cache
 
-Multi-tier caches typically require clients to check multiple stores:
+Multi-tier caches typically require clients to orchestrate lookups:
 
 ```csharp
 // ❌ Complex: Client must orchestrate L1/L2 checks
@@ -46,7 +90,7 @@ var entry = l1Cache.Get(id) ?? l2Cache.Get(id);
 cache.GetEntryOrDefault(id, out var entry); // Automatic tier management
 ```
 
-### 3. Resilient Iteration Despite Deletions
+#### 3. Resilient Iteration Despite Deletions
 
 Traditional ordered collections break when entries are deleted during iteration:
 
@@ -62,7 +106,7 @@ cache.Remove(currentId, out _);
 cache.GetNextOrDefault(currentId, out var next); // Finds next valid entry
 ```
 
-### 4. Multi-Speed Consumer Memory Management
+#### 4. Multi-Speed Consumer Memory Management
 
 Multiple consumers reading at different speeds cause memory leaks:
 
@@ -78,7 +122,7 @@ Multiple consumers reading at different speeds cause memory leaks:
 var config = new Configuration { EvictAfterEveryX = 100 };
 ```
 
-### 5. Producer-Consumer Coordination
+#### 5. Producer-Consumer Coordination
 
 Traditional caches require polling to detect new entries:
 
@@ -108,27 +152,55 @@ await foreach (var entry in cache.GetFutureAsyncEnumerator(cancellationToken))
 }
 ```
 
-### Key Benefits Summary
+**Key Benefits:**
+- **Zero latency**: Consumers resume instantly when producers add entries
+- **Zero CPU waste**: Consumers block efficiently (no spin loops)
+- **Adaptive sizing**: Memory usage adjusts to production rate automatically
+- **Extensible design**: Pluggable storage backends and metadata implementations (enabling distributed scenarios via `Baubit.Caching.Redis` - work in progress)
 
-1. **Time-Ordered IDs**: GuidV7 provides sortable, collision-free identifiers
-2. **Transparent Tiering**: L1/L2 fallback invisible to consumers
-3. **Deletion Resilient**: Iteration continues despite out-of-order removals
-4. **Memory Safety**: Automatic eviction behind slowest consumer prevents leaks
-5. **Zero Latency**: Consumers resume instantly when producers add entries (no polling delay)
-6. **Zero CPU Waste**: Consumers block efficiently (no spin loops)
-7. **Adaptive Sizing**: Memory usage adjusts to production rate automatically
-8. **Extensible Design**: Pluggable storage backends (L2 can be backed by persistent storage) and metadata implementations (enabling distributed cache scenarios via `Baubit.Caching.Redis` - work in progress)
+## Core Concepts
+
+### Entry
+
+An `IEntry<TValue>` represents a cache entry:
+- **Id** (`Guid`): GuidV7 identifier (time-ordered, sortable)
+- **CreatedOnUTC** (`DateTime`): UTC timestamp when entry was added
+- **Value** (`TValue`): The cached data
+
+### Head and Tail
+
+- **Head**: The oldest entry (first added, lowest GuidV7 timestamp)
+- **Tail**: The newest entry (last added, highest GuidV7 timestamp)
+
+Operations like `GetFirstOrDefault` return the head; `GetLastOrDefault` returns the tail.
+
+### GetNext Semantics
+
+`GetNextOrDefault(id, out var next)` returns the entry **after** the given `id`. If `id` was deleted:
+1. The metadata tracks the deleted node's position in the linked list
+2. `GetNext` walks forward to find the next valid entry
+3. Returns `false` if no valid entry exists after `id`
+
+This ensures iteration continues even when entries are removed out-of-order.
+
+### Enumerator Tracking and Eviction
+
+- Each `IAsyncEnumerable` enumerator registers its current position with metadata
+- Eviction (triggered every `EvictAfterEveryX` adds) removes entries **before** the slowest active enumerator
+- Abandoned enumerators that are not disposed will pin memory indefinitely
+
+**Rule:** Entries are evicted only when **all active enumerators** have advanced past them.
 
 ## Architecture
 
-```
+```text
 +-------------------------------------------------------+
 |                  OrderedCache<TValue>                 |
 |                                                       |
-|   +----------------+        +----------------+        |
-|   |    L1 Store    |  ───▶  |    L2 Store    |        |
-|   |   (Bounded)    |        |   (Bounded)    |        |
-|   +----------------+        +----------------+        |
+|   +----------------+        +-------------------+     |
+|   |    L1 Store    |  ───▶  |     L2 Store      |     |
+|   |   (Bounded)    |        |   (Unbounded)     |     |
+|   +----------------+        +-------------------+     |
 |           │                         │                 |
 |           └───────────┬─────────────┘                 |
 |                       │                               |
@@ -137,17 +209,22 @@ await foreach (var entry in cache.GetFutureAsyncEnumerator(cancellationToken))
 |               |  (LinkedList)  |                      |
 |               +----------------+                      |
 +-------------------------------------------------------+
-
 ```
 
-- **L1 Store**: Optional bounded in-memory cache (hot entries)
-- **L2 Store**: Required unbounded backing store (all entries)
-- **Metadata**: Ordered linked list of GuidV7 IDs with O(1) head/tail access
-- **Locking**: `ReaderWriterLockSlim` for concurrent access
+- **L1 Store**: Optional bounded in-memory cache (hot entries, configurable min/max capacity)
+- **L2 Store**: Required **unbounded** backing store (holds all entries)
+- **Metadata**: Ordered doubly-linked list of GuidV7 IDs with O(1) head/tail access
+- **Locking**: `ReaderWriterLockSlim` for concurrent access (multiple readers, single writer)
+
+**Flow:**
+1. `Add` inserts to L2, then replenishes L1 if space available
+2. `GetEntryOrDefault` checks L1 first, falls back to L2 on miss
+3. Eviction removes entries from both L1 and L2 based on slowest enumerator position
 
 ## API Reference
 
-### IOrderedCache&lt;TValue&gt;
+<details>
+<summary><strong>IOrderedCache&lt;TValue&gt;</strong> (click to expand)</summary>
 
 ```csharp
 public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisposable
@@ -173,8 +250,10 @@ public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisp
     Task<IEntry<TValue>> GetFutureFirstOrDefaultAsync(CancellationToken ct = default);
 }
 ```
+</details>
 
-### IEntry&lt;TValue&gt;
+<details>
+<summary><strong>IEntry&lt;TValue&gt;</strong> (click to expand)</summary>
 
 ```csharp
 public interface IEntry<TValue>
@@ -184,21 +263,7 @@ public interface IEntry<TValue>
     TValue Value { get; }
 }
 ```
-
-### Configuration
-
-```csharp
-public record Configuration
-{
-    bool RunAdaptiveResizing { get; init; } = false;  // Enable L1 dynamic sizing
-    int AdaptionWindowMS { get; init; } = 2_000;      // Resize evaluation interval
-    int GrowStep { get; init; } = 64;                 // L1 growth increment
-    int ShrinkStep { get; init; } = 32;               // L1 shrink decrement
-    double RoomRateLowerLimit { get; init; } = 1;     // Shrink threshold (entries/sec)
-    double RoomRateUpperLimit { get; init; } = 5;     // Grow threshold (entries/sec)
-    int EvictAfterEveryX { get; init; } = 100;        // Eviction frequency (adds)
-}
-```
+</details>
 
 ## Usage
 
@@ -212,7 +277,7 @@ using Microsoft.Extensions.Logging;
 var config = new Configuration { EvictAfterEveryX = 100 };
 var metadata = new Metadata { Configuration = config };
 var l1Store = new Store<string>(100, 1000, loggerFactory); // Min: 100, Max: 1000
-var l2Store = new Store<string>(loggerFactory);            // Uncapped
+var l2Store = new Store<string>(loggerFactory);            // Unbounded
 
 using var cache = new OrderedCache<string>(
     config, l1Store, l2Store, metadata, loggerFactory
@@ -229,48 +294,146 @@ Console.WriteLine(entry.Id);  // e.g., 01933c4a-4f2e-7b40-8000-123456789abc
 // Update existing entry
 cache.Update(entry.Id, "new_value");
 
-// Remove entry
+// Remove entry (safe during iteration)
 cache.Remove(entry.Id, out var removed);
+
+// Clear all entries
+cache.Clear();
 ```
 
 ### Read Operations
 
 ```csharp
-// Direct access by ID
+// Direct access by ID (checks L1 → L2)
 cache.GetEntryOrDefault(id, out var entry);
 
 // Get head/tail
 cache.GetFirstOrDefault(out var first);
 cache.GetLastOrDefault(out var last);
 
-// Sequential navigation
+// Sequential navigation (handles deleted nodes)
 cache.GetNextOrDefault(currentId, out var next);
+
+// Get IDs only (metadata-only operation)
+cache.GetFirstIdOrDefault(out var firstId);
+cache.GetLastIdOrDefault(out var lastId);
 ```
 
 ### Async Enumeration
 
 ```csharp
-// Enumerate existing entries
+// Enumerate existing entries (from head to tail)
 await foreach (var entry in cache)
 {
     Console.WriteLine($"{entry.Id}: {entry.Value}");
 }
 
 // Wait for future entries (blocks until new entries arrive)
-await foreach (var entry in cache.GetFutureAsyncEnumerator())
+await foreach (var entry in cache.GetFutureAsyncEnumerator(cancellationToken))
 {
     Console.WriteLine($"New: {entry.Value}");
 }
-```
 
-### Async Waiting
-
-```csharp
 // Wait for next entry after current position
 var next = await cache.GetNextAsync(currentId, cancellationToken);
 
 // Wait for first future entry (after current tail)
 var future = await cache.GetFutureFirstOrDefaultAsync(cancellationToken);
+```
+
+### Multi-Consumer Streaming
+
+```csharp
+// Producer task
+var producerCts = new CancellationTokenSource();
+_ = Task.Run(async () =>
+{
+    while (!producerCts.Token.IsCancellationRequested)
+    {
+        cache.Add($"Event-{DateTime.UtcNow.Ticks}", out _);
+        await Task.Delay(100);
+    }
+});
+
+// Consumer 1 (fast)
+var consumer1Cts = new CancellationTokenSource();
+_ = Task.Run(async () =>
+{
+    await foreach (var entry in cache.GetFutureAsyncEnumerator(consumer1Cts.Token))
+    {
+        Console.WriteLine($"[Fast] {entry.Value}");
+        await Task.Delay(50); // Fast processing
+    }
+});
+
+// Consumer 2 (slow)
+var consumer2Cts = new CancellationTokenSource();
+_ = Task.Run(async () =>
+{
+    await foreach (var entry in cache.GetFutureAsyncEnumerator(consumer2Cts.Token))
+    {
+        Console.WriteLine($"[Slow] {entry.Value}");
+        await Task.Delay(500); // Slow processing
+    }
+});
+
+// Eviction will keep entries until consumer2 (slowest) has processed them
+await Task.Delay(10_000);
+
+// Cleanup: Cancel all tokens to dispose enumerators
+consumer1Cts.Cancel();
+consumer2Cts.Cancel();
+producerCts.Cancel();
+```
+
+## Configuration
+
+### Adaptive Resizing
+
+When enabled, L1 capacity dynamically adjusts based on production rate:
+
+```csharp
+var config = new Configuration
+{
+    RunAdaptiveResizing = true,
+    AdaptionWindowMS = 2_000,        // Sample every 2 seconds
+    RoomRateUpperLimit = 5,          // Grow if >5 entries/sec
+    RoomRateLowerLimit = 1,          // Shrink if <1 entry/sec
+    GrowStep = 64,                   // L1 growth increment
+    ShrinkStep = 32                  // L1 shrink decrement
+};
+```
+
+**Behavior:**
+- Measures entries added per second over `AdaptionWindowMS` intervals
+- Grows L1 when rate exceeds `RoomRateUpperLimit`
+- Shrinks L1 when rate falls below `RoomRateLowerLimit`
+- Automatically replenishes L1 from L2 after shrink
+
+### Eviction
+
+Entries are evicted based on active enumerator positions:
+
+```csharp
+var config = new Configuration { EvictAfterEveryX = 100 };
+```
+
+- Every 100 `Add` operations, evicts entries **before** the slowest active enumerator
+- Prevents unbounded memory growth when consumers lag behind producers
+- Disabled by setting `EvictAfterEveryX = int.MaxValue`
+
+**Configuration Options:**
+```csharp
+public record Configuration
+{
+    bool RunAdaptiveResizing { get; init; } = false;  // Enable L1 dynamic sizing
+    int AdaptionWindowMS { get; init; } = 2_000;      // Resize evaluation interval
+    int GrowStep { get; init; } = 64;                 // L1 growth increment
+    int ShrinkStep { get; init; } = 32;               // L1 shrink decrement
+    double RoomRateLowerLimit { get; init; } = 1;     // Shrink threshold (entries/sec)
+    double RoomRateUpperLimit { get; init; } = 5;     // Grow threshold (entries/sec)
+    int EvictAfterEveryX { get; init; } = 100;        // Eviction frequency (adds)
+}
 ```
 
 ## Performance
@@ -303,40 +466,6 @@ var future = await cache.GetFutureFirstOrDefaultAsync(cancellationToken);
 
 See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) for detailed analysis.
 
-## Adaptive Resizing
-
-When enabled, L1 capacity dynamically adjusts based on production rate:
-
-```csharp
-var config = new Configuration
-{
-    RunAdaptiveResizing = true,
-    AdaptionWindowMS = 2_000,        // Sample every 2 seconds
-    RoomRateUpperLimit = 5,          // Grow if >5 entries/sec
-    RoomRateLowerLimit = 1,          // Shrink if <1 entry/sec
-    GrowStep = 64,
-    ShrinkStep = 32
-};
-```
-
-**Behavior:**
-- Measures entries added per second
-- Grows L1 when rate exceeds `RoomRateUpperLimit`
-- Shrinks L1 when rate falls below `RoomRateLowerLimit`
-- Automatically replenishes L1 from L2 after shrink
-
-## Eviction
-
-Entries are evicted based on active enumerator positions:
-
-```csharp
-var config = new Configuration { EvictAfterEveryX = 100 };
-```
-
-- Every 100 `Add` operations, evicts entries before the slowest active enumerator
-- Prevents memory growth when consumers lag behind producers
-- Disabled by setting `EvictAfterEveryX = int.MaxValue`
-
 ## Thread Safety
 
 - **Concurrent Reads**: Multiple threads can read simultaneously (read lock)
@@ -354,13 +483,47 @@ var config = new Configuration { EvictAfterEveryX = 100 };
 | **Time-Series Cache** | GuidV7 provides chronological ordering |
 | **Change Data Capture** | Stream processing with position tracking |
 
-## Limitations
+## Gotchas / FAQ
 
-- **Not**: Random-access key-value store (use `Dictionary<,>`)
-- **Not**: Distributed cache (single-process only)
-- **Not**: Persistent storage (use database for durability)
-- **L1 Bounded**: May not contain all entries (check L2 on miss)
-- **Write Latency**: ~1μs per `Add` due to locking + metadata updates
+### Q: What if I don't use GuidV7 for IDs?
+
+**A:** Ordering relies on GuidV7's time-embedded structure. If you assign custom IDs, the cache still maintains **insertion order**, but `Id` values won't be naturally sortable by timestamp. Use `CreatedOnUTC` for time-based sorting in that case.
+
+### Q: Can slow enumerators cause memory leaks?
+
+**A:** Yes. Enumerators that are not disposed will pin memory indefinitely, preventing eviction of entries they haven't processed. Always:
+- Use `using` with enumerators
+- Cancel `CancellationToken` when consumers shut down
+- Set appropriate `EvictAfterEveryX` to limit growth
+
+### Q: Is it safe to remove entries during iteration?
+
+**A:** Yes. `GetNextOrDefault` and `GetNextAsync` skip deleted nodes. If the current ID is removed, the next call finds the next valid entry. This is safe even with concurrent removals across multiple threads.
+
+### Q: What happens if I remove an entry while an enumerator is at that position?
+
+**A:** The metadata retains the deleted node's position in the linked list temporarily. `GetNext` walks forward to find the next valid entry. Once all enumerators advance past the deleted node, it's eligible for cleanup.
+
+### Q: Can I use this as a distributed cache?
+
+**A:** Not directly. `OrderedCache` is single-process. For distributed scenarios, see the **Roadmap** for `Baubit.Caching.Redis` (work in progress), which will enable pluggable distributed metadata providers.
+
+### Q: Why is L2 unbounded?
+
+**A:** L2 is the source of truth for all entries. Bounding it would require eviction logic that conflicts with the guarantee that all entries are accessible by ID. Use eviction policies (via enumerator tracking) to manage memory instead.
+
+### Q: What's the difference between `GetNextAsync` and `GetFutureAsyncEnumerator`?
+
+**A:** 
+- `GetNextAsync(id)`: Waits for the next entry after `id`. Returns immediately if it exists, blocks otherwise.
+- `GetFutureAsyncEnumerator()`: Returns an `IAsyncEnumerable` starting from the current tail, yielding all future entries as they're added.
+
+## Roadmap
+
+- **`Baubit.Caching.Redis` (WIP)**: Distributed metadata provider for multi-node coordination
+- **Pluggable L2 backends**: Enable persistent L2 stores (e.g., SQLite, RocksDB)
+- **Compression support**: Transparent value compression for large entries
+- **Metrics API**: Expose eviction counts, hit rates, enumerator lag metrics
 
 ## Benchmarks
 
@@ -370,7 +533,6 @@ dotnet run -c Release
 ```
 
 Results saved to `RESULTS.md` with ops/sec metrics for read/write/mixed scenarios.
-
 
 ## License
 
