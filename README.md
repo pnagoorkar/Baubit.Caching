@@ -36,7 +36,6 @@ Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumera
 - [Thread Safety](#thread-safety)
 - [Use Cases](#use-cases)
 - [Gotchas / FAQ](#gotchas--faq)
-- [Roadmap](#roadmap)
 - [Benchmarks](#benchmarks)
 - [License](#license)
 
@@ -517,13 +516,6 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 **A:** 
 - `GetNextAsync(id)`: Waits for the next entry after `id`. Returns immediately if it exists, blocks otherwise.
 - `GetFutureAsyncEnumerator()`: Returns an `IAsyncEnumerable` starting from the current tail, yielding all future entries as they're added.
-
-## Roadmap
-
-- **`Baubit.Caching.Redis` (WIP)**: Distributed metadata provider for multi-node coordination
-- **Pluggable L2 backends**: Enable persistent L2 stores (e.g., SQLite, RocksDB)
-- **Compression support**: Transparent value compression for large entries
-- **Metrics API**: Expose eviction counts, hit rates, enumerator lag metrics
 
 ## Benchmarks
 
