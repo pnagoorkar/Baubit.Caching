@@ -55,7 +55,7 @@ dotnet add package Baubit.Caching
 4. **Memory safety**: Automatic eviction behind slowest consumer prevents leaks
 5. **Zero-latency streaming**: Consumers resume instantly when producers add entries (no polling)
 
-### Detailed Motivations
+### In-Depth
 
 #### 1. Time-Ordered Identity Without Dual Fields
 
