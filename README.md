@@ -6,7 +6,8 @@
 
 Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
 
-**In 30 seconds:** `OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID). You can:
+#### **In 30 seconds:** 
+`OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID). You can:
 - fetch any entry by ID in O(1),
 - walk entries in chronological order,
 - `await foreach` future entries with zero polling,
@@ -19,7 +20,7 @@ Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumera
 - [Installation](#installation)
 - [Why?](#why)
   - [TL;DR](#tldr)
-  - [Detailed Motivations](#detailed-motivations)
+  - [In-Depth](#in-depth)
 - [Core Concepts](#core-concepts)
 - [Architecture](#architecture)
 - [API Reference](#api-reference)
@@ -59,7 +60,7 @@ dotnet add package Baubit.Caching
 
 #### 1. Time-Ordered Identity Without Dual Fields
 
-Event sourcing and audit logs need both unique IDs and timestamps:
+Event sourcing and audit logs need explicit time stamps for time-ordering:
 
 ```csharp
 // ❌ Redundant: Separate ID + Timestamp fields
@@ -111,7 +112,7 @@ Multiple consumers reading at different speeds cause memory leaks:
 
 ```csharp
 // ❌ Problem: Fast consumers read 1000 entries, slow consumer at entry 10
-// → Cache holds 990 unneeded entries
+// → Cache needs to retain 990 entries
 ```
 
 `OrderedCache` tracks all active enumerators and automatically evicts only entries that **all consumers** have passed:
@@ -145,9 +146,10 @@ while (true)
 
 ```csharp
 // ✅ Efficient: Await future entries
-await foreach (var entry in cache.GetFutureAsyncEnumerator(cancellationToken))
+var enumerator = cache.GetFutureAsyncEnumerator(cancellationToken);
+while (await enumerator.MoveNextAsync()) // yields immediately when producer adds entry
 {
-    Process(entry); // Executes immediately when producer adds entry
+    Process(enumerator.Current);
 }
 ```
 
@@ -213,7 +215,7 @@ This ensures iteration continues even when entries are removed out-of-order.
 - **L1 Store**: Optional bounded in-memory cache (hot entries, configurable min/max capacity)
 - **L2 Store**: Required **unbounded** backing store (holds all entries)
 - **Metadata**: Ordered doubly-linked list of GuidV7 IDs with O(1) head/tail access
-- **Locking**: `ReaderWriterLockSlim` for concurrent access (multiple readers, single writer)
+- **Concurrency**: `ReaderWriterLockSlim` for concurrent access (multiple readers, single writer)
 
 **Flow:**
 1. `Add` inserts to L2, then replenishes L1 if space available
@@ -322,15 +324,17 @@ cache.GetLastIdOrDefault(out var lastId);
 
 ```csharp
 // Enumerate existing entries (from head to tail)
-await foreach (var entry in cache)
+var enumerator = cache.GetAsyncEnumerator(cancellationToken);
+while (await enumerator.MoveNextAsync())
 {
-    Console.WriteLine($"{entry.Id}: {entry.Value}");
+    Console.WriteLine($"{enumerator.Current.Id}: {enumerator.Current.Value}");
 }
 
 // Wait for future entries (blocks until new entries arrive)
-await foreach (var entry in cache.GetFutureAsyncEnumerator(cancellationToken))
+var enumerator = cache.GetFutureAsyncEnumerator(cancellationToken);
+while (await enumerator.MoveNextAsync())
 {
-    Console.WriteLine($"New: {entry.Value}");
+    Console.WriteLine($"New: {enumerator.Current.Value}");
 }
 
 // Wait for next entry after current position
@@ -358,9 +362,10 @@ _ = Task.Run(async () =>
 var consumer1Cts = new CancellationTokenSource();
 _ = Task.Run(async () =>
 {
-    await foreach (var entry in cache.GetFutureAsyncEnumerator(consumer1Cts.Token))
+    var enumerator = cache.GetFutureAsyncEnumerator(consumer1Cts.Token);
+    while (await enumerator.MoveNextAsync())
     {
-        Console.WriteLine($"[Fast] {entry.Value}");
+        Console.WriteLine($"[Fast] {enumerator.Current.Value}");
         await Task.Delay(50); // Fast processing
     }
 });
@@ -369,9 +374,10 @@ _ = Task.Run(async () =>
 var consumer2Cts = new CancellationTokenSource();
 _ = Task.Run(async () =>
 {
-    await foreach (var entry in cache.GetFutureAsyncEnumerator(consumer2Cts.Token))
+    var enumerator = cache.GetFutureAsyncEnumerator(consumer2Cts.Token);
+    while (await enumerator.MoveNextAsync())
     {
-        Console.WriteLine($"[Slow] {entry.Value}");
+        Console.WriteLine($"[Slow] {enumerator.Current.Value}");
         await Task.Delay(500); // Slow processing
     }
 });
@@ -464,13 +470,6 @@ public record Configuration
 
 See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) for detailed analysis.
 
-## Thread Safety
-
-- **Concurrent Reads**: Multiple threads can read simultaneously (read lock)
-- **Writes Block All**: Single writer blocks all readers/writers (write lock)
-- **Lock Implementation**: `ReaderWriterLockSlim` with recursive support
-- **Deadlock Prevention**: Always acquire locks in consistent order
-
 ## Use Cases
 
 | Scenario | Why OrderedCache |
@@ -482,10 +481,6 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 | **Change Data Capture** | Stream processing with position tracking |
 
 ## Gotchas / FAQ
-
-### Q: What if I don't use GuidV7 for IDs?
-
-**A:** Ordering relies on GuidV7's time-embedded structure. If you assign custom IDs, the cache still maintains **insertion order**, but `Id` values won't be naturally sortable by timestamp. Use `CreatedOnUTC` for time-based sorting in that case.
 
 ### Q: Can slow enumerators cause memory leaks?
 
@@ -504,7 +499,7 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 
 ### Q: Can I use this as a distributed cache?
 
-**A:** Not directly. `OrderedCache` is single-process. For distributed scenarios, see the **Roadmap** for `Baubit.Caching.Redis` (work in progress), which will enable pluggable distributed metadata providers.
+**A:** Not directly. `OrderedCache` is single-process. Future extensions planned to extend this project for distributed caching.
 
 ### Q: Why is L2 unbounded?
 
