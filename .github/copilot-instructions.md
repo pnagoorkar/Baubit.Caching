@@ -197,6 +197,27 @@ All Baubit components use a standardized CircleCI pipeline with four jobs:
    - NuGet package is published to nuget.org
    - Release tags are created automatically
 
+#### Generating Release Notes
+
+When asked to generate release notes, analyze commits on `master` branch since the latest release tag. Format:
+
+**Added**
+- New features and public APIs
+
+**Changed**
+- Modified behavior and API changes
+
+**Fixed**
+- Bug fixes and corrections
+
+**Removed**
+- Deprecated/removed features and APIs
+
+**Breaking Changes**
+- API changes requiring code updates
+
+Focus on what users need to know: feature changes, API modifications, and behavioral updates. Omit internal implementation details, file names, and commit SHAs. Keep descriptions factual and concise. No fluff.
+
 ### Pre-commit Checklist
 
 Before committing code:
