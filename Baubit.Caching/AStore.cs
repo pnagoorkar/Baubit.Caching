@@ -1,14 +1,24 @@
 ﻿using Microsoft.Extensions.Logging;
+using System;
 
 namespace Baubit.Caching
 {
     public abstract class AStore<TValue> : IStore<TValue>
     {
         public bool Uncapped { get => !TargetCapacity.HasValue; }
-        public long? MinCapacity { get; init; } = null;
-        public long? MaxCapacity { get; init; } = null;
+        public long? MinCapacity { get; set; } = null;
+        public long? MaxCapacity { get; set; } = null;
         public long? TargetCapacity { get; private set; } = null;
-        public long? CurrentCapacity { get => Uncapped ? null : Math.Max(0, TargetCapacity!.Value - GetCount()!.Value); }
+        public long? CurrentCapacity 
+        { 
+            get 
+            { 
+                if (Uncapped) return null;
+                var count = GetCount();
+                if (!count.HasValue) return null;
+                return Math.Max(0, TargetCapacity.Value - count.Value);
+            } 
+        }
         public bool HasCapacity { get => Uncapped || CurrentCapacity > 0; }
 
         public abstract Guid? HeadId { get; }
@@ -29,34 +39,34 @@ namespace Baubit.Caching
 
         public abstract bool Add(IEntry<TValue> entry);
 
-        public abstract bool Add(Guid id, TValue value, out IEntry<TValue>? entry);
+        public abstract bool Add(Guid id, TValue value, out IEntry<TValue> entry);
 
         public bool AddCapacity(int additionalCapacity)
         {
             if (Uncapped) return true;
-            TargetCapacity = Math.Min(MaxCapacity!.Value, TargetCapacity!.Value + additionalCapacity);
+            TargetCapacity = Math.Min(MaxCapacity.Value, TargetCapacity.Value + additionalCapacity);
             return true;
         }
 
         public bool CutCapacity(int cap)
         {
             if (Uncapped) return true;
-            TargetCapacity = Math.Max(MinCapacity!.Value, TargetCapacity!.Value - cap);
+            TargetCapacity = Math.Max(MinCapacity.Value, TargetCapacity.Value - cap);
             return true;
         }
 
         private long? GetCount()
         {
-            return GetCount(out var count) ? count : null;
+            return GetCount(out var count) ? count : (long?)null;
         }
 
         public abstract bool GetCount(out long count);
 
-        public abstract bool GetEntryOrDefault(Guid? id, out IEntry<TValue>? entry);
+        public abstract bool GetEntryOrDefault(Guid? id, out IEntry<TValue> entry);
 
-        public abstract bool GetValueOrDefault(Guid? id, out TValue? value);
+        public abstract bool GetValueOrDefault(Guid? id, out TValue value);
 
-        public abstract bool Remove(Guid id, out IEntry<TValue>? entry);
+        public abstract bool Remove(Guid id, out IEntry<TValue> entry);
 
         public abstract bool Update(IEntry<TValue> entry);
 

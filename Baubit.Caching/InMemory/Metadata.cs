@@ -1,11 +1,16 @@
 ﻿using Baubit.Identity;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Baubit.Caching.InMemory
 {
     public class Metadata : IMetadata
     {
-        public LinkedList<Guid> CurrentOrder { get; init; } = new LinkedList<Guid>();
-        public Dictionary<Guid, LinkedListNode<Guid>> IdNodeMap { get; init; } = new Dictionary<Guid, LinkedListNode<Guid>>();
+        public LinkedList<Guid> CurrentOrder { get; set; } = new LinkedList<Guid>();
+        public Dictionary<Guid, LinkedListNode<Guid>> IdNodeMap { get; set; } = new Dictionary<Guid, LinkedListNode<Guid>>();
 
         public long Count { get => IdNodeMap.Count; }
 
@@ -15,7 +20,7 @@ namespace Baubit.Caching.InMemory
         /// <summary>
         /// Gets the runtime configuration for this cache instance.
         /// </summary>
-        public Configuration Configuration { get; init; }
+        public Configuration Configuration { get; set; }
 
         private long _roomCount;
 
@@ -54,7 +59,7 @@ namespace Baubit.Caching.InMemory
             else if (IsIdSmallerThanHeadId(id)) nextId = HeadId;
             else if (IsIdTailId(id)) nextId = null;
             else if (id.HasValue && IdNodeMap.TryGetValue(id.Value, out var node)) nextId = node.Next.Value;
-            else nextId = IdNodeMap.Keys.Order().FirstOrDefault(key => key > id); // If an id is neither null, nor less than head nor tail nor an in-between id and the id is not found in IdNodeMap means the value was deleted out of order. Return the next big id after it.
+            else nextId = IdNodeMap.Keys.OrderBy(key => key).FirstOrDefault(key => key.CompareTo(id.Value) > 0); // If an id is neither null, nor less than head nor tail nor an in-between id and the id is not found in IdNodeMap means the value was deleted out of order. Return the next big id after it.
             return true;
         }
 
@@ -84,31 +89,31 @@ namespace Baubit.Caching.InMemory
         public bool GetIdsThrough(Guid id, out IEnumerable<Guid> ids)
         {
             // (Empty store || if id preceeds the head) = do nothing
-            if (CurrentOrder.Count == 0 || id < HeadId)
+            if (CurrentOrder.Count == 0 || (HeadId.HasValue && id.CompareTo(HeadId.Value) < 0))
             {
-                ids = [];
+                ids = new Guid[0];
                 return false;
             }
 
             // If id is at/after the tail -> whole list
-            if (id >= TailId)
+            if (TailId.HasValue && id.CompareTo(TailId.Value) >= 0)
             {
-                ids = Enumerate(CurrentOrder.First!, CurrentOrder.Last!).ToArray();
+                ids = Enumerate(CurrentOrder.First, CurrentOrder.Last).ToArray();
                 return true;
             }
 
             if (!IdNodeMap.TryGetValue(id, out var end))
             {
                 // this method is intended to be called from the ordered cache and it is assumed that the cache will ALWAYS send an id that IS present in the IdNodeMap.
-                // if this method ever gets executed, the above assumption must not longer be true.
-                ids = [];
+                // if this block ever gets executed, the above assumption must not longer be true.
+                ids = new Guid[0];
                 return false;
             }
 
-            ids = Enumerate(CurrentOrder.First!, end).ToArray();
+            ids = Enumerate(CurrentOrder.First, end).ToArray();
             return true;
 
-            static IEnumerable<Guid> Enumerate(LinkedListNode<Guid> start, LinkedListNode<Guid> endInclusive)
+            IEnumerable<Guid> Enumerate(LinkedListNode<Guid> start, LinkedListNode<Guid> endInclusive)
             {
                 for (var n = start; n != null; n = n.Next)
                 {
@@ -118,15 +123,16 @@ namespace Baubit.Caching.InMemory
             }
         }
 
-        private bool IsIdSmallerThanHeadId(Guid? id) => id.HasValue && HeadId.HasValue && id < HeadId;
+        private bool IsIdSmallerThanHeadId(Guid? id) => id.HasValue && HeadId.HasValue && id.Value.CompareTo(HeadId.Value) < 0;
 
         private bool IsIdTailId(Guid? id) => id.HasValue && TailId.HasValue && id == TailId;
 
         public bool Remove(Guid id)
         {
-            if (IdNodeMap.Remove(id, out var node))
+            if (IdNodeMap.TryGetValue(id, out var node))
             {
                 CurrentOrder.Remove(node);
+                IdNodeMap.Remove(id);
                 return true;
             }
             return false;
