@@ -112,6 +112,8 @@ jobs:
         default: ""
     machine:
       image: ubuntu-2204:current
+    environment:
+      MSBUILDTERMINALLOGGER: off #Workaround while https://github.com/dotnet/msbuild/issues/11213 exists
     steps:
       - run:
           name: Parameter check
