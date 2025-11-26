@@ -30,12 +30,12 @@ namespace Baubit.Caching
         /// <summary>
         /// Maximum capacity the store may grow to, if bounded.
         /// </summary>
-        long? MaxCapacity { get; init; }
+        long? MaxCapacity { get; set; }
 
         /// <summary>
         /// Minimum capacity the store may shrink to, if bounded.
         /// </summary>
-        long? MinCapacity { get; init; }
+        long? MinCapacity { get; set; }
 
         /// <summary>
         /// The intended/target capacity for the store when using adaptive resizing.
@@ -67,7 +67,7 @@ namespace Baubit.Caching
         /// <param name="value">The value to add.</param>
         /// <param name="entry">When the method returns <c>true</c>, contains the created entry.</param>
         /// <returns><c>true</c> if the value was added; otherwise <c>false</c>.</returns>
-        bool Add(Guid id, TValue value, out IEntry<TValue>? entry);
+        bool Add(Guid id, TValue value, out IEntry<TValue> entry);
 
         /// <summary>
         /// Increases the store capacity by the specified amount (implementation-defined semantics).
@@ -96,7 +96,7 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="entry">On success, the located entry; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetEntryOrDefault(Guid? id, out IEntry<TValue>? entry);
+        bool GetEntryOrDefault(Guid? id, out IEntry<TValue> entry);
 
         /// <summary>
         /// Gets a value by identifier, or a default value if not present.
@@ -104,7 +104,7 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="value">On success, the located value; otherwise default.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetValueOrDefault(Guid? id, out TValue? value);
+        bool GetValueOrDefault(Guid? id, out TValue value);
 
         /// <summary>
         /// Removes an entry by identifier.
@@ -112,7 +112,7 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="entry">On success, the removed entry.</param>
         /// <returns><c>true</c> if an entry was removed; otherwise <c>false</c>.</returns>
-        bool Remove(Guid id, out IEntry<TValue>? entry);
+        bool Remove(Guid id, out IEntry<TValue> entry);
 
         /// <summary>
         /// Updates an entry in-place.

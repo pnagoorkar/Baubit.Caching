@@ -22,7 +22,10 @@ namespace Baubit.Caching
             Interlocked.Increment(ref _numOfGuests);
             try
             {
-                return await tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                using (cancellationToken.Register(() => tcs.TrySetCanceled()))
+                {
+                    return await tcs.Task.ConfigureAwait(false);
+                }
             }
             finally
             {

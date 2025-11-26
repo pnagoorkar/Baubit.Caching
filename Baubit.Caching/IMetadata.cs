@@ -11,7 +11,7 @@ namespace Baubit.Caching
         Guid? HeadId { get; }
         Guid? TailId { get; }
 
-        internal long ResetRoomCount();
+        long ResetRoomCount();
         bool AddTail(Guid id);
         bool ContainsKey(Guid id);
         bool GetNextId(Guid? id, out Guid? nextId);

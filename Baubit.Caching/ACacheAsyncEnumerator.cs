@@ -7,7 +7,7 @@ namespace Baubit.Caching
 {
     public abstract class ACacheAsyncEnumerator<TValue> : IAsyncEnumerator<IEntry<TValue>>, ICacheEnumerator
     {
-        public IEntry<TValue>? Current { get; protected set; }
+        public IEntry<TValue> Current { get; protected set; }
         public Guid? CurrentId => Current?.Id;
 
         protected readonly IOrderedCache<TValue> _cache;
@@ -28,7 +28,7 @@ namespace Baubit.Caching
         {
             _onDispose?.Invoke(this);
             cancellationTokenRegistration.Dispose();
-            return ValueTask.CompletedTask;
+            return default(ValueTask);
         }
 
         public virtual async ValueTask<bool> MoveNextAsync()
@@ -38,7 +38,7 @@ namespace Baubit.Caching
             {
                 Current = await _cache.GetNextAsync(CurrentId, _cancellationToken).ConfigureAwait(false);
             }
-            catch (TaskCanceledException tcExp)
+            catch (TaskCanceledException)
             {
                 // expected when _cancellationToken is cancelled
                 return false;
