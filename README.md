@@ -431,7 +431,7 @@ var config = new Configuration { EvictAfterEveryX = 100 };
 
 **Configuration Options:**
 ```csharp
-public record Configuration
+public class Configuration : AConfiguration
 {
     bool RunAdaptiveResizing { get; init; } = false;  // Enable L1 dynamic sizing
     int AdaptionWindowMS { get; init; } = 2_000;      // Resize evaluation interval
