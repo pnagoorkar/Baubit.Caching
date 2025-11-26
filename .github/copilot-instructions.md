@@ -12,8 +12,8 @@ This is part of the **Baubit framework** - a collection of focused, componentize
 
 ## Technology Stack
 
-- **Target Framework**: .NET 9.0
-- **Language**: C# with modern language features (records, pattern matching, nullable reference types)
+- **Target Framework**: .NET Standard 2.0 (for broad compatibility) and .NET 9.0 (for modern features)
+- **Language**: C# with language features compatible with .NET Standard 2.0
 - **Testing**: xUnit with comprehensive unit and integration tests
 - **CI/CD**: CircleCI with automated build, test, and publish pipelines
 - **Package Distribution**: NuGet (GitHub Packages for pre-release, NuGet.org for releases)
@@ -28,7 +28,7 @@ All Baubit components follow a consistent structure:
 Baubit.{ComponentName}/
 ├── Baubit.{ComponentName}/              # Main library project
 │   ├── {Core classes and interfaces}
-│   └── Baubit.{ComponentName}.csproj    # Targets .NET 9.0
+│   └── Baubit.{ComponentName}.csproj    # Multi-targets .NET Standard 2.0 and .NET 9.0
 ├── Baubit.{ComponentName}.Test/        # Test project
 │   ├── {Test classes}
 │   └── Baubit.{ComponentName}.Test.csproj
@@ -47,11 +47,14 @@ Baubit.{ComponentName}/
 ### C# Style and Conventions
 
 1. **Modern C# Features**
-   - Use C# 12+ features where appropriate (primary constructors, collection expressions, etc.)
-   - Enable nullable reference types: `<Nullable>enable</Nullable>`
-   - Prefer records for immutable data types
-   - Use pattern matching and switch expressions for clarity
+   - Use C# 7.3 features (compatible with .NET Standard 2.0)
+   - Enable nullable reference types where supported: `<Nullable>enable</Nullable>`
+   - Use tuples for returning multiple values
+   - Use pattern matching (basic forms available in C# 7.3)
    - Leverage `readonly struct` for value types to prevent mutations
+   - **Avoid**: Primary constructors, collection expressions, required members, file-scoped types (C# 10+)
+   - **Avoid**: Default interface implementations (C# 8+)
+   - **Avoid**: Records (C# 9+) - use classes or structs instead
 
 2. **Naming Conventions**
    - PascalCase for public members, types, and namespaces
@@ -78,8 +81,8 @@ Baubit.{ComponentName}/
 
 1. **Dependency Management**
    - **CRITICAL**: Minimize external dependencies - each dependency is a liability
-   - Prefer .NET standard library APIs over third-party packages
-   - If dependencies are required, justify them in PR descriptions
+   - Prefer .NET Standard 2.0 compatible APIs
+   - If dependencies are required, ensure they support .NET Standard 2.0
    - Never add dependencies for convenience - only for essential functionality
    - Keep the dependency graph flat - avoid transitive dependency chains
 
@@ -95,8 +98,9 @@ Baubit.{ComponentName}/
 3. **Performance**
    - Minimize allocations - prefer value types and object pooling
    - Avoid LINQ in hot paths - use for loops for performance-critical code
-   - Use `Span<T>`, `Memory<T>`, and `stackalloc` for efficient memory handling
+   - Use `Span<T>` and `Memory<T>` only when targeting .NET 9.0 specifically (use preprocessor directives)
    - Profile before optimizing - measure don't guess
+   - **Note**: Stack allocation and advanced memory APIs are limited in .NET Standard 2.0
 
 4. **Error Handling**
    - Use exception filters and specific exception types
@@ -145,7 +149,7 @@ Baubit.{ComponentName}/
 ### Example Test Structure
 
 ```csharp
-public Baubit.Identity.Test.GuidV7Generator
+namespace Baubit.Identity.Test.GuidV7Generator
 {
     public class Test
     {
@@ -227,6 +231,7 @@ Before committing code:
 - [ ] No new external dependencies (or justified if necessary)
 - [ ] Code coverage meets minimum requirements
 - [ ] README.md updated if public API changed
+- [ ] Code compiles for both .NET Standard 2.0 and .NET 9.0 targets
 
 ## Common Development Tasks
 
@@ -239,11 +244,13 @@ Before committing code:
 5. Add integration tests if API interacts with other components
 6. Update README.md with API reference and examples
 7. Consider backward compatibility and versioning
+8. Ensure compatibility with .NET Standard 2.0
 
 ### Modifying Existing APIs
 
 1. Always add tests for modified behavior
 2. Update documentation to reflect changes
+3. Test against both .NET Standard 2.0 and .NET 9.0 targets
 
 ### Adding Dependencies
 
@@ -252,7 +259,7 @@ Before committing code:
 1. Justify why the dependency is essential
 2. Evaluate the dependency's stability and maintenance
 3. Check for security vulnerabilities
-4. Ensure it doesn't conflict with .NET 9.0 standard library
+4. Ensure it supports .NET Standard 2.0
 5. Document the decision in PR description
 6. Update README.md dependencies section
 
@@ -264,6 +271,7 @@ Before committing code:
 4. Document performance improvements in PR
 5. Ensure optimizations don't sacrifice readability or maintainability
 6. Consider caching, object pooling, or lazy initialization patterns
+7. Use preprocessor directives for target-specific optimizations
 
 ## Documentation Standards
 
@@ -288,6 +296,7 @@ Every component README should include:
 - Show realistic usage scenarios
 - Provide both simple and advanced examples
 - Test examples to ensure they compile and run
+- Ensure examples work with .NET Standard 2.0
 
 ## Security Practices
 
@@ -313,10 +322,11 @@ This document should evolve with the project. When you identify:
 
 - [.NET API Design Guidelines](https://learn.microsoft.com/en-us/dotnet/standard/design-guidelines/)
 - [C# Coding Conventions](https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions)
+- [.NET Standard 2.0 API Reference](https://learn.microsoft.com/en-us/dotnet/standard/net-standard)
 - [xUnit Documentation](https://xunit.net/)
 - [CircleCI .NET Docs](https://circleci.com/docs/language-dotnet/)
 - [Semantic Versioning](https://semver.org/)
 
 ---
 
-**Remember**: Baubit components are designed to be production-grade, high-performance building blocks. Every line of code should reflect this commitment to quality, simplicity, and reliability.
+**Remember**: Baubit components are designed to be production-grade, high-performance building blocks that support broad compatibility through .NET Standard 2.0 while leveraging modern features when targeting .NET 9.0. Every line of code should reflect this commitment to quality, simplicity, and reliability.

@@ -1,4 +1,9 @@
-﻿namespace Baubit.Caching
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Baubit.Caching
 {
     /// <summary>
     /// An ordered, append-only cache with monotonically increasing identifiers.
@@ -11,7 +16,7 @@
         /// <summary>
         /// The number of entries currently present.
         /// </summary>
-        public long Count { get; }
+        long Count { get; }
 
         /// <summary>
         /// Adds a new value to the tail of the cache.
@@ -35,7 +40,7 @@
         /// <param name="id">The identifier to look up.</param>
         /// <param name="entry">On success, the located entry; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetEntryOrDefault(Guid? id, out IEntry<TValue>? entry);
+        bool GetEntryOrDefault(Guid? id, out IEntry<TValue> entry);
 
         /// <summary>
         /// Gets the next entry after <paramref name="id"/>, or the head entry when <paramref name="id"/> is <c>null</c>.
@@ -43,14 +48,14 @@
         /// <param name="id">The current id, or <c>null</c> to start from the head.</param>
         /// <param name="entry">On success, the next entry; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetNextOrDefault(Guid? id, out IEntry<TValue>? entry);
+        bool GetNextOrDefault(Guid? id, out IEntry<TValue> entry);
 
         /// <summary>
         /// Tries to retrieve the first (head) entry.
         /// </summary>
         /// <param name="entry">On success, the first entry; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetFirstOrDefault(out IEntry<TValue>? entry);
+        bool GetFirstOrDefault(out IEntry<TValue> entry);
 
         /// <summary>
         /// Returns the id of the first (head) entry.
@@ -64,7 +69,7 @@
         /// </summary>
         /// <param name="entry">On success, the last entry; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetLastOrDefault(out IEntry<TValue>? entry);
+        bool GetLastOrDefault(out IEntry<TValue> entry);
 
         /// <summary>
         /// Returns the id of the last (tail) entry.
@@ -96,7 +101,7 @@
         /// <param name="id">The identifier to remove.</param>
         /// <param name="entry">On success, the removed entry.</param>
         /// <returns><c>true</c> if an entry was removed; otherwise <c>false</c>.</returns>
-        bool Remove(Guid id, out IEntry<TValue>? entry);
+        bool Remove(Guid id, out IEntry<TValue> entry);
 
         /// <summary>
         /// Removes all entries from the cache.

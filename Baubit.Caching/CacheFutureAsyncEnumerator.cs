@@ -1,4 +1,7 @@
-﻿namespace Baubit.Caching
+﻿using System;
+using System.Threading;
+
+namespace Baubit.Caching
 {
     public class CacheFutureAsyncEnumerator<TValue> : ACacheAsyncEnumerator<TValue>
     {

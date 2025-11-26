@@ -2,9 +2,7 @@
 
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyVersion>$(AssemblyVersion)</AssemblyVersion>
@@ -28,11 +26,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Baubit.Tasks" Version="2025.47.1" />
+    <PackageReference Include="Baubit.Tasks" Version="2025.48.1" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.5" />
-    <PackageReference Include="Baubit.Collections" Version="2025.47.1" />
-    <PackageReference Include="Baubit.Identity" Version="2025.45.2" />
-    <PackageReference Include="Baubit.Configuration" Version="2025.47.5" />
+    <PackageReference Include="Baubit.Collections" Version="2025.48.2" />
+    <PackageReference Include="Baubit.Identity" Version="2025.48.1" />
+    <PackageReference Include="Baubit.Configuration" Version="2025.48.1" />
   </ItemGroup>
 
 </Project>
