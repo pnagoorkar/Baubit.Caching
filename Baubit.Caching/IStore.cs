@@ -1,4 +1,6 @@
-﻿namespace Baubit.Caching
+﻿using System;
+
+namespace Baubit.Caching
 {
     /// <summary>
     /// Abstraction for a storage layer used by <see cref="IOrderedCache{TValue}"/> implementations.

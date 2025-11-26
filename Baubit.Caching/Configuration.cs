@@ -2,7 +2,7 @@
 
 namespace Baubit.Caching
 {
-    public record Configuration : AConfiguration
+    public class Configuration : AConfiguration
     {
         public bool RunAdaptiveResizing { get; init; } = false;
         public int AdaptionWindowMS { get; init; } = 2_000;

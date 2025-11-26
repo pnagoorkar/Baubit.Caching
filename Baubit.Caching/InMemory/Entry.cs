@@ -1,4 +1,6 @@
-﻿namespace Baubit.Caching.InMemory
+﻿using System;
+
+namespace Baubit.Caching.InMemory
 {
     public class Entry<TValue> : IEntry<TValue>
     {

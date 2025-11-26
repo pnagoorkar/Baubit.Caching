@@ -1,4 +1,6 @@
-﻿namespace Baubit.Caching
+﻿using System;
+
+namespace Baubit.Caching
 {
     public interface IEntry<TValue>
     {
