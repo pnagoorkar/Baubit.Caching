@@ -105,7 +105,7 @@ namespace Baubit.Caching.InMemory
             if (!IdNodeMap.TryGetValue(id, out var end))
             {
                 // this method is intended to be called from the ordered cache and it is assumed that the cache will ALWAYS send an id that IS present in the IdNodeMap.
-                // if this method ever gets executed, the above assumption must not longer be true.
+                // if this block ever gets executed, the above assumption must not longer be true.
                 ids = new Guid[0];
                 return false;
             }

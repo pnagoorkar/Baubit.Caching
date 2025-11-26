@@ -416,5 +416,61 @@
             // Assert - No exception thrown
             Assert.Equal(1, metadata.Count); // Data should still be present after dispose
         }
+
+        [Fact]
+        public void Metadata_GetNextId_DeletedMiddleId_ReturnsNextBiggestId()
+        {
+            // Arrange - Tests line 62: out-of-order deletion scenario
+            // When an id is not in IdNodeMap but is between head and tail
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+            metadata.AddTail(id3);
+
+            // Act - Remove middle id and then ask for next of that removed id
+            metadata.Remove(id2);
+            var result = metadata.GetNextId(id2, out var nextId);
+
+            // Assert - Should return id3 (the next biggest id after id2)
+            Assert.True(result);
+            Assert.Equal(id3, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_IdNotInMap_ReturnsEmptyAndFalse()
+        {
+            // Arrange - Tests lines 106-110: edge case where id is in range but not in IdNodeMap
+            var metadata = new Caching.InMemory.Metadata();
+            var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
+            var idNotInMap = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            metadata.AddTail(id1);
+            metadata.AddTail(id3);
+
+            // Act - Request ids through an id that's in range but not in the map
+            var result = metadata.GetIdsThrough(idNotInMap, out var ids);
+
+            // Assert
+            Assert.False(result);
+            Assert.Empty(ids);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_EmptyMetadata_WithNonNullId_ReturnsNull()
+        {
+            // Arrange - Tests line 58: when HeadId is null but id is not null
+            var metadata = new Caching.InMemory.Metadata();
+            var someId = Guid.NewGuid();
+
+            // Act
+            var result = metadata.GetNextId(someId, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(nextId);
+        }
     }
 }
