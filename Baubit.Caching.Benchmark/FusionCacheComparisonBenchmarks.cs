@@ -108,7 +108,8 @@ public class FusionCacheComparisonBenchmarks
     [BenchmarkCategory("Write")]
     public void FusionCache_Write()
     {
-        _fusionCache!.Set($"new_key_{_writeCounter++}", $"NewValue_{_writeCounter}");
+        var counter = _writeCounter++;
+        _fusionCache!.Set($"new_key_{counter}", $"NewValue_{counter}");
     }
 
     // ==================== UPDATE BENCHMARKS ====================
@@ -158,7 +159,8 @@ public class FusionCacheComparisonBenchmarks
         }
 
         // 1 write
-        _fusionCache!.Set($"mixed_key_{_writeCounter++}", $"Mixed_{_writeCounter}");
+        var counter = _writeCounter++;
+        _fusionCache!.Set($"mixed_key_{counter}", $"Mixed_{counter}");
     }
 
     [Benchmark(Description = "Baubit: 50% Read, 50% Write")]
@@ -182,7 +184,8 @@ public class FusionCacheComparisonBenchmarks
         _fusionCache!.TryGet<string>(key);
 
         // 1 write
-        _fusionCache!.Set($"mixed_key_{_writeCounter++}", $"Mixed_{_writeCounter}");
+        var counter50 = _writeCounter++;
+        _fusionCache!.Set($"mixed_key_{counter50}", $"Mixed_{counter50}");
     }
 
     [GlobalCleanup]
