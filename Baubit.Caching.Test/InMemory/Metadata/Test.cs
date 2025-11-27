@@ -413,8 +413,13 @@
             // Act
             metadata.Dispose();
 
-            // Assert - No exception thrown
-            Assert.Equal(1, metadata.Count); // Data should still be present after dispose
+            // Assert - Cannot access properties after dispose
+            Assert.Null(metadata.Configuration);
+            Assert.Null(metadata.CurrentOrder);
+            Assert.Null(metadata.HeadId);
+            Assert.Null(metadata.IdNodeMap);
+            Assert.Null(metadata.TailId);
+            Assert.Throws<NullReferenceException>(() => metadata.Count);
         }
 
         [Fact]

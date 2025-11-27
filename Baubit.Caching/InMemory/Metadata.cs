@@ -58,6 +58,7 @@ namespace Baubit.Caching.InMemory
             else if (IsIdSmallerThanHeadId(id)) nextId = HeadId;
             else if (IsIdTailId(id)) nextId = null;
             else if (id.HasValue && IdNodeMap.TryGetValue(id.Value, out var node)) nextId = node.Next?.Value;
+            // If an id is neither null, nor less than head nor tail nor an in-between id and the id is not found in IdNodeMap means the value was deleted out of order. Return the next big id after it.
             else nextId = FindNextGreaterId(id.Value); // Optimized: avoid LINQ OrderBy
             return true;
         }
@@ -168,7 +169,11 @@ namespace Baubit.Caching.InMemory
             {
                 if (disposing)
                 {
-
+                    IdNodeMap.Clear();
+                    IdNodeMap = null;
+                    CurrentOrder.Clear();
+                    CurrentOrder = null;
+                    Configuration = null;
                 }
                 disposedValue = true;
             }
