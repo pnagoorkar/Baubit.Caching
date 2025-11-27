@@ -1,7 +1,6 @@
 ﻿using Baubit.Identity;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -58,9 +57,30 @@ namespace Baubit.Caching.InMemory
             else if (HeadId == null) nextId = null; // if id is not null but HeadId is null means id is the tail that was deleted just before the call arrived here. Return null so the caller can get the next arriving item
             else if (IsIdSmallerThanHeadId(id)) nextId = HeadId;
             else if (IsIdTailId(id)) nextId = null;
-            else if (id.HasValue && IdNodeMap.TryGetValue(id.Value, out var node)) nextId = node.Next.Value;
-            else nextId = IdNodeMap.Keys.OrderBy(key => key).FirstOrDefault(key => key.CompareTo(id.Value) > 0); // If an id is neither null, nor less than head nor tail nor an in-between id and the id is not found in IdNodeMap means the value was deleted out of order. Return the next big id after it.
+            else if (id.HasValue && IdNodeMap.TryGetValue(id.Value, out var node)) nextId = node.Next?.Value;
+            // If an id is neither null, nor less than head nor tail nor an in-between id and the id is not found in IdNodeMap means the value was deleted out of order. Return the next big id after it.
+            else nextId = FindNextGreaterId(id.Value); // Optimized: avoid LINQ OrderBy
             return true;
+        }
+
+        /// <summary>
+        /// Finds the smallest ID in the map that is greater than the given ID.
+        /// This is an O(n) linear scan but avoids LINQ sorting allocations.
+        /// </summary>
+        private Guid? FindNextGreaterId(Guid id)
+        {
+            Guid? result = null;
+            foreach (var key in IdNodeMap.Keys)
+            {
+                if (key.CompareTo(id) > 0)
+                {
+                    if (!result.HasValue || key.CompareTo(result.Value) < 0)
+                    {
+                        result = key;
+                    }
+                }
+            }
+            return result;
         }
 
         public Task<Guid> GetNextIdAsync(Guid? id, CancellationToken cancellationToken)
@@ -91,14 +111,14 @@ namespace Baubit.Caching.InMemory
             // (Empty store || if id preceeds the head) = do nothing
             if (CurrentOrder.Count == 0 || (HeadId.HasValue && id.CompareTo(HeadId.Value) < 0))
             {
-                ids = new Guid[0];
+                ids = Array.Empty<Guid>();
                 return false;
             }
 
             // If id is at/after the tail -> whole list
             if (TailId.HasValue && id.CompareTo(TailId.Value) >= 0)
             {
-                ids = Enumerate(CurrentOrder.First, CurrentOrder.Last).ToArray();
+                ids = EnumerateToList(CurrentOrder.First, CurrentOrder.Last);
                 return true;
             }
 
@@ -106,21 +126,26 @@ namespace Baubit.Caching.InMemory
             {
                 // this method is intended to be called from the ordered cache and it is assumed that the cache will ALWAYS send an id that IS present in the IdNodeMap.
                 // if this block ever gets executed, the above assumption must not longer be true.
-                ids = new Guid[0];
+                ids = Array.Empty<Guid>();
                 return false;
             }
 
-            ids = Enumerate(CurrentOrder.First, end).ToArray();
+            ids = EnumerateToList(CurrentOrder.First, end);
             return true;
+        }
 
-            IEnumerable<Guid> Enumerate(LinkedListNode<Guid> start, LinkedListNode<Guid> endInclusive)
+        /// <summary>
+        /// Enumerates nodes from start to endInclusive and returns a list to avoid iterator allocations.
+        /// </summary>
+        private static List<Guid> EnumerateToList(LinkedListNode<Guid> start, LinkedListNode<Guid> endInclusive)
+        {
+            var result = new List<Guid>();
+            for (var n = start; n != null; n = n.Next)
             {
-                for (var n = start; n != null; n = n.Next)
-                {
-                    yield return n.Value;
-                    if (ReferenceEquals(n, endInclusive)) yield break;
-                }
+                result.Add(n.Value);
+                if (ReferenceEquals(n, endInclusive)) break;
             }
+            return result;
         }
 
         private bool IsIdSmallerThanHeadId(Guid? id) => id.HasValue && HeadId.HasValue && id.Value.CompareTo(HeadId.Value) < 0;
@@ -144,7 +169,11 @@ namespace Baubit.Caching.InMemory
             {
                 if (disposing)
                 {
-
+                    IdNodeMap.Clear();
+                    IdNodeMap = null;
+                    CurrentOrder.Clear();
+                    CurrentOrder = null;
+                    Configuration = null;
                 }
                 disposedValue = true;
             }

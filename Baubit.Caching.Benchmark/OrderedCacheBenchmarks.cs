@@ -1,4 +1,7 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Columns;
+using BenchmarkDotNet.Reports;
+using BenchmarkDotNet.Running;
 using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -10,6 +13,7 @@ namespace Baubit.Caching.Benchmark;
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob(warmupCount: 3, iterationCount: 10, invocationCount: 10000)]
+[RankColumn]
 public class OrderedCacheBenchmarks
 {
     private OrderedCache<string>? _cache;
