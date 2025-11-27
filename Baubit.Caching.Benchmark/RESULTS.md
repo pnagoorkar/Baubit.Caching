@@ -1,129 +1,134 @@
 # OrderedCache Performance Results
 
-**Date:** November 27, 2025  
-**System:** BenchmarkDotNet v0.15.6, .NET 9.0.11  
+**System:** Intel Core Ultra 9 185H @ 2.50GHz, Windows 11 (10.0.26200.7171)  
+**Runtime:** .NET 9.0.11, X64 RyuJIT x86-64-v3  
+**Date:** Nov 27, 2025
 
 ---
 
 ## FusionCache Comparison
 
-Baubit.Caching OrderedCache was benchmarked against ZiggyCreatures.FusionCache 2.4.0.
+### Read Operations (Direct Lookup by ID/Key)
 
-### Key Findings
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **10.00M** | **1** |
+| FusionCache | 1,000 | 3.34M | 3 |
+| **Baubit** | 10,000 | **7.30M** | **2** |
+| FusionCache | 10,000 | 3.37M | 3 |
 
-| Operation | Baubit.Caching | FusionCache | Winner |
-|-----------|---------------|-------------|--------|
-| **Read** | **149-182 ns** | 419-434 ns | **Baubit 2.4-2.9x faster** ✅ |
-| **Update** | **151-221 ns** | 333-755 ns | **Baubit 2.2-3.4x faster** ✅ |
-| **Add/Set** | 2,182-2,390 ns | **887-1,350 ns** | FusionCache 1.6-2.5x faster |
+**Baubit 2.2-3.0x faster**
 
-### Read Operations
+### Update Operations (Modify Existing Entry)
 
-| Library | Cache Size | Mean Latency | Allocated |
-|---------|------------|--------------|-----------|
-| **Baubit** | 1,000 | **149 ns** | 24 B |
-| FusionCache | 1,000 | 420 ns | 96 B |
-| **Baubit** | 10,000 | **182 ns** | 24 B |
-| FusionCache | 10,000 | 433 ns | 96 B |
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **7.75M** | **2** |
+| FusionCache | 1,000 | 2.31M | 4 |
+| **Baubit** | 10,000 | **7.48M** | **2** |
+| FusionCache | 10,000 | 2.18M | 4 |
 
-**Baubit reads are 2.4-2.9x faster with 4x less memory allocation.**
+**Baubit 3.3-3.4x faster**
 
-### Update Operations
+### Write/Add Operations (New Entry Creation)
 
-| Library | Cache Size | Mean Latency | Allocated |
-|---------|------------|--------------|-----------|
-| **Baubit** | 1,000 | **199 ns** | 99 B |
-| FusionCache | 1,000 | 719 ns | 224 B |
-| **Baubit** | 10,000 | **151-221 ns** | 99 B |
-| FusionCache | 10,000 | 333-755 ns | 224 B |
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **1.51M** | **5** |
+| FusionCache | 1,000 | 1.16M | 5 |
+| **Baubit** | 10,000 | **1.26M** | **5** |
+| FusionCache | 10,000 | 1.23M | 5 |
 
-**Baubit updates are 2.2-3.4x faster with less than half the memory allocation.**
+**Baubit 1.0-1.3x faster**
 
-### Write/Add Operations
+### Mixed Workload: 80% Read / 20% Write
 
-| Library | Cache Size | Mean Latency | Allocated |
-|---------|------------|--------------|-----------|
-| Baubit | 1,000 | 2,182 ns | 352 B |
-| **FusionCache** | 1,000 | **887 ns** | 328 B |
-| Baubit | 10,000 | 2,204-2,390 ns | 352 B |
-| **FusionCache** | 10,000 | **898-1,350 ns** | 328 B |
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **682K** | **6** |
+| FusionCache | 1,000 | 500K | 7 |
+| **Baubit** | 10,000 | **563K** | **7** |
+| FusionCache | 10,000 | 449K | 7 |
 
-**FusionCache is faster for write/add operations due to simpler metadata management.**
+**Baubit 1.3-1.4x faster**
+
+### Mixed Workload: 50% Read / 50% Write
+
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **1.06M** | **5** |
+| FusionCache | 1,000 | 713K | 6 |
+| **Baubit** | 10,000 | **945K** | **5** |
+| FusionCache | 10,000 | 715K | 6 |
+
+**Baubit 1.3-1.5x faster**
 
 ---
 
-## Performance Optimizations Applied
-
-The following optimizations were applied to improve Baubit.Caching performance:
-
-1. **Cached HeadId/TailId in Store**: Eliminated O(n) Min/Max operations on every read by caching head/tail IDs
-2. **In-place Update**: Optimized Update method to modify existing entries in-place instead of creating new Entry objects
-3. **Replaced LINQ OrderBy**: Replaced `OrderBy().FirstOrDefault()` with direct iteration to avoid sorting allocations
-4. **Direct List instead of Iterator**: Replaced yield-based enumeration with direct List construction to reduce allocations
-
----
-
-## Throughput Summary (Operations per Second)
+## OrderedCache Standalone Performance
 
 ### Read-Only Workloads
 
-| Operation | Cache Size | Mean Latency | **Ops/Second** | Memory |
-|-----------|------------|--------------|----------------|--------|
-| GetEntryOrDefault | 1,000 | 149 ns | **6.71M ops/sec** | 24 B |
-| GetEntryOrDefault | 10,000 | 182 ns | **5.49M ops/sec** | 24 B |
+| Operation | Cache Size | Ops/Sec | Rank |
+|-----------|------------|---------|------|
+| GetFirstOrDefault | 1,000 | **14.60M** | **1** |
+| GetFirstOrDefault | 10,000 | **13.44M** | **1** |
+| GetEntryOrDefault | 1,000 | **10.24M** | **2** |
+| GetEntryOrDefault | 10,000 | **8.08M** | **3** |
+| GetNextOrDefault | 1,000 | **5.17M** | **4** |
+| GetNextOrDefault | 10,000 | **4.63M** | **4** |
 
 ### Write-Only Workloads
 
-| Operation | Cache Size | Mean Latency | **Ops/Second** | Memory |
-|-----------|------------|--------------|----------------|--------|
-| Add | 1,000 | 2,182 ns | **458K ops/sec** | 352 B |
-| Add | 10,000 | 2,204 ns | **454K ops/sec** | 352 B |
-| Update | 1,000 | 199 ns | **5.03M ops/sec** | 99 B |
-| Update | 10,000 | 151 ns | **6.62M ops/sec** | 99 B |
+| Operation | Cache Size | Ops/Sec | Rank |
+|-----------|------------|---------|------|
+| Update | 1,000 | **2.40M** | **5** |
+| Update | 10,000 | **2.30M** | **5** |
+| Add | 1,000 | **915K** | **6** |
+| Add | 10,000 | **886K** | **6** |
 
----
+### Mixed Workloads
 
-## When to Use Baubit.Caching vs FusionCache
-
-### Choose Baubit.Caching When:
-- ✅ **Read-heavy workloads** (>70% reads) - 2-3x faster reads
-- ✅ **Frequent updates** - 2-3x faster update performance  
-- ✅ **Ordered/sequential access** is required (event sourcing, logs, queues)
-- ✅ **Memory efficiency** is critical - lower allocations on reads/updates
-- ✅ **Async enumeration** with producer-consumer patterns
-
-### Choose FusionCache When:
-- ✅ **Write-heavy workloads** (>50% writes) - 2x faster writes
-- ✅ **Standard key-value cache** semantics (no ordering required)
-- ✅ **Distributed caching** with Redis backplane
-- ✅ **Fail-safe/stale data** fallback is needed
-- ✅ **Factory pattern** for cache-aside with stampede protection
+| Workload | Cache Size | Ops/Sec | Rank |
+|----------|------------|---------|------|
+| 50% Read / 50% Write | 1,000 | **742K** | **7** |
+| 50% Read / 50% Write | 10,000 | **677K** | **7** |
+| 80% Read / 20% Write | 1,000 | **548K** | **8** |
+| 80% Read / 20% Write | 10,000 | **461K** | **9** |
 
 ---
 
 ## Raw Benchmark Data
 
+### vs. FusionCache
+
 ```
-BenchmarkDotNet v0.15.6
-Runtime=.NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v4
+BenchmarkDotNet v0.15.6, Windows 11 (10.0.26200.7171)
+Intel Core Ultra 9 185H 2.50GHz, 1 CPU, 22 logical and 16 physical cores
+.NET SDK 10.0.100, .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
 
-| Method                               | CacheSize | Mean        | Allocated |
-|------------------------------------- |---------- |------------:|----------:|
-| 'Baubit: Read by ID'                 | 1000      |   149.02 ns |      24 B |
-| 'FusionCache: Read by Key'           | 1000      |   419.50 ns |      96 B |
-| 'Baubit: Read by ID'                 | 10000     |   182.17 ns |      24 B |
-| 'FusionCache: Read by Key'           | 10000     |   433.55 ns |      96 B |
-| 'Baubit: Update Existing'            | 1000      |   198.64 ns |      99 B |
-| 'FusionCache: Update Existing'       | 1000      |   718.76 ns |     224 B |
-| 'Baubit: Update Existing'            | 10000     |   220.80 ns |      99 B |
-| 'FusionCache: Update Existing'       | 10000     |   754.95 ns |     224 B |
-| 'Baubit: Add New Entry'              | 1000      | 2,181.76 ns |     352 B |
-| 'FusionCache: Set New Entry'         | 1000      |   887.40 ns |     328 B |
-| 'Baubit: Add New Entry'              | 10000     | 2,203.76 ns |     352 B |
-| 'FusionCache: Set New Entry'         | 10000     |   897.61 ns |     328 B |
+| Method                             | Categories | CacheSize | Mean        | Rank | Allocated |
+|----------------------------------- |----------- |---------- |------------:|-----:|----------:|
+| 'Baubit: Read by ID'               | Read       | 1000      |    99.98 ns |    1 |         - |
+| 'FusionCache: Read by Key'         | Read       | 1000      |   299.45 ns |    3 |         - |
+| 'Baubit: Read by ID'               | Read       | 10000     |   137.07 ns |    2 |         - |
+| 'FusionCache: Read by Key'         | Read       | 10000     |   296.98 ns |    3 |         - |
+| 'Baubit: Update Existing'          | Update     | 1000      |   129.05 ns |    2 |      99 B |
+| 'FusionCache: Update Existing'     | Update     | 1000      |   432.28 ns |    4 |     224 B |
+| 'Baubit: Update Existing'          | Update     | 10000     |   133.64 ns |    2 |      99 B |
+| 'FusionCache: Update Existing'     | Update     | 10000     |   458.83 ns |    4 |     224 B |
+| 'Baubit: Add New Entry'            | Write      | 1000      |   662.07 ns |    5 |     224 B |
+| 'FusionCache: Set New Entry'       | Write      | 1000      |   863.58 ns |    5 |     328 B |
+| 'Baubit: Add New Entry'            | Write      | 10000     |   791.91 ns |    5 |     224 B |
+| 'FusionCache: Set New Entry'       | Write      | 10000     |   813.14 ns |    5 |     328 B |
+| 'Baubit: 80% Read, 20% Write'      | Mixed      | 1000      | 1,466.29 ns |    6 |     192 B |
+| 'FusionCache: 80% Read, 20% Write' | Mixed      | 1000      | 2,001.61 ns |    7 |     320 B |
+| 'Baubit: 50% Read, 50% Write'      | Mixed      | 1000      |   943.41 ns |    5 |     192 B |
+| 'FusionCache: 50% Read, 50% Write' | Mixed      | 1000      | 1,403.34 ns |    6 |     320 B |
+| 'Baubit: 80% Read, 20% Write'      | Mixed      | 10000     | 1,774.83 ns |    7 |     216 B |
+| 'FusionCache: 80% Read, 20% Write' | Mixed      | 10000     | 2,227.46 ns |    7 |     320 B |
+| 'Baubit: 50% Read, 50% Write'      | Mixed      | 10000     | 1,058.04 ns |    5 |     192 B |
+| 'FusionCache: 50% Read, 50% Write' | Mixed      | 10000     | 1,398.59 ns |    6 |     320 B |
 ```
 
----
 
-**Runtime:** 8m 36s  
-**Benchmarks Executed:** 40

@@ -1,4 +1,8 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Columns;
+using BenchmarkDotNet.Reports;
+using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Configs;
 using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging.Abstractions;
 using ZiggyCreatures.Caching.Fusion;
@@ -11,6 +15,8 @@ namespace Baubit.Caching.Benchmark;
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob(warmupCount: 3, iterationCount: 10, invocationCount: 10000)]
+[RankColumn]
+[CategoriesColumn]
 public class FusionCacheComparisonBenchmarks
 {
     private OrderedCache<string>? _baubitCache;
