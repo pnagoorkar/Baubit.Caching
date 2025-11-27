@@ -1,14 +1,17 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Baubit.Caching.InMemory
 {
     public class Store<TValue> : AStore<TValue>
     {
-        public override Guid? HeadId { get => _data.Count > 0 ? (Guid?)_data.Keys.Min() : null; }
-        public override Guid? TailId { get => _data.Count > 0 ? (Guid?)_data.Keys.Max() : null; }
+        // Cache the head and tail IDs to avoid O(n) Min/Max operations
+        private Guid? _headId;
+        private Guid? _tailId;
+
+        public override Guid? HeadId { get => _headId; }
+        public override Guid? TailId { get => _tailId; }
 
         private readonly Dictionary<Guid, IEntry<TValue>> _data = new Dictionary<Guid, IEntry<TValue>>();
 
@@ -31,6 +34,7 @@ namespace Baubit.Caching.InMemory
             if (!HasCapacity) return false;
             if (_data.ContainsKey(entry.Id)) return false;
             _data[entry.Id] = entry;
+            UpdateHeadTailOnAdd(entry.Id);
             return true;
         }
 
@@ -38,6 +42,66 @@ namespace Baubit.Caching.InMemory
         {
             entry = new Entry<TValue>(id, value);
             return Add(entry);
+        }
+
+        private void UpdateHeadTailOnAdd(Guid id)
+        {
+            // GuidV7 IDs are time-ordered, so new entries are always the tail
+            // Head is the smallest, tail is the largest
+            if (!_headId.HasValue || id.CompareTo(_headId.Value) < 0)
+            {
+                _headId = id;
+            }
+            if (!_tailId.HasValue || id.CompareTo(_tailId.Value) > 0)
+            {
+                _tailId = id;
+            }
+        }
+
+        private void UpdateHeadTailOnRemove(Guid id)
+        {
+            if (_data.Count == 0)
+            {
+                _headId = null;
+                _tailId = null;
+                return;
+            }
+
+            // Only recalculate if we removed the head or tail
+            if (_headId.HasValue && id.CompareTo(_headId.Value) == 0)
+            {
+                _headId = FindMin();
+            }
+            if (_tailId.HasValue && id.CompareTo(_tailId.Value) == 0)
+            {
+                _tailId = FindMax();
+            }
+        }
+
+        private Guid? FindMin()
+        {
+            Guid? min = null;
+            foreach (var key in _data.Keys)
+            {
+                if (!min.HasValue || key.CompareTo(min.Value) < 0)
+                {
+                    min = key;
+                }
+            }
+            return min;
+        }
+
+        private Guid? FindMax()
+        {
+            Guid? max = null;
+            foreach (var key in _data.Keys)
+            {
+                if (!max.HasValue || key.CompareTo(max.Value) > 0)
+                {
+                    max = key;
+                }
+            }
+            return max;
         }
 
         public override bool GetCount(out long count)
@@ -65,6 +129,7 @@ namespace Baubit.Caching.InMemory
             if (_data.TryGetValue(id, out entry))
             {
                 _data.Remove(id);
+                UpdateHeadTailOnRemove(id);
                 return true;
             }
             entry = default(IEntry<TValue>);
@@ -80,12 +145,25 @@ namespace Baubit.Caching.InMemory
 
         public override bool Update(Guid id, TValue value)
         {
+            // Optimize: avoid creating new Entry if we can update in-place
+            if (_data.TryGetValue(id, out var existingEntry))
+            {
+                // The Entry<TValue> class has a setter for Value, so update it directly
+                if (existingEntry is Entry<TValue> typedEntry)
+                {
+                    typedEntry.Value = value;
+                    return true;
+                }
+            }
+            // Fallback to creating a new entry
             return Update(new Entry<TValue>(id, value));
         }
 
         protected override void DisposeInternal()
         {
             _data.Clear();
+            _headId = null;
+            _tailId = null;
         }
     }
 }
