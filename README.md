@@ -446,7 +446,7 @@ public class Configuration : AConfiguration
 ## Performance
 
 **System:** Intel Core Ultra 9 185H @ 2.50GHz, .NET 9.0.11  
-**Date:** January 9, 2025
+**Date:** Nov 27, 2025
 
 | Operation | Latency | Throughput | Rank | Allocations |
 |-----------|---------|------------|------|-------------|
