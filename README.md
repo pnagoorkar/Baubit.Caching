@@ -448,23 +448,23 @@ public class Configuration : AConfiguration
 **System:** Intel Core Ultra 9 185H @ 2.50GHz, .NET 9.0.11  
 **Date:** Nov 27, 2025
 
-| Operation | Latency | Throughput | Rank | Allocations |
-|-----------|---------|------------|------|-------------|
-| `GetFirstOrDefault` | 68-74 ns | **13.4-14.6M ops/sec** | 1 | 0 B |
-| `GetEntryOrDefault` | 98-124 ns | **8.1-10.2M ops/sec** | 2-3 | 0 B |
-| `GetNextOrDefault` | 193-216 ns | **4.6-5.2M ops/sec** | 4 | 0 B |
-| `Update` | 416-435 ns | **2.3-2.4M ops/sec** | 5 | 155 B |
-| `Add` | 1,093-1,128 ns | **886K-915K ops/sec** | 6 | 256-288 B |
+| Operation | Latency | Throughput | Allocations |
+|-----------|---------|------------|-------------|
+| `GetFirstOrDefault` | 68-74 ns | **13.4-14.6M ops/sec** | 0 B |
+| `GetEntryOrDefault` | 98-124 ns | **8.1-10.2M ops/sec** | 0 B |
+| `GetNextOrDefault` | 193-216 ns | **4.6-5.2M ops/sec** | 0 B |
+| `Update` | 416-435 ns | **2.3-2.4M ops/sec** | 155 B |
+| `Add` | 1,093-1,128 ns | **886K-915K ops/sec** | 256-288 B |
 
 ### Workload Performance
 
-| Workload | Throughput | Rank |
-|----------|------------|------|
-| Read-Only | 4.6-14.6M ops/sec | 1-4 |
-| Write-Only (Update) | 2.3-2.4M ops/sec | 5 |
-| Write-Only (Add) | 886K-915K ops/sec | 6 |
-| Mixed (50/50 R/W) | 677K-742K ops/sec | 7 |
-| Mixed (80/20 R/W) | 461K-548K ops/sec | 8-9 |
+| Workload | Throughput |
+|----------|------------|
+| Read-Only | 4.6-14.6M ops/sec | 
+| Write-Only (Update) | 2.3-2.4M ops/sec | 
+| Write-Only (Add) | 886K-915K ops/sec | 
+| Mixed (50/50 R/W) | 677K-742K ops/sec | 
+| Mixed (80/20 R/W) | 461K-548K ops/sec | 
 
 ### vs. FusionCache
 
