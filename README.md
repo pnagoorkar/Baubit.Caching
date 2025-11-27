@@ -445,33 +445,53 @@ public class Configuration : AConfiguration
 
 ## Performance
 
-**System:** Intel Core Ultra 9 185H @ 2.50GHz, .NET 9.0.11
+**System:** Intel Core Ultra 9 185H @ 2.50GHz, .NET 9.0.11  
+**Date:** Nov 27, 2025
 
 | Operation | Latency | Throughput | Allocations |
 |-----------|---------|------------|-------------|
-| `GetFirstOrDefault` | 66 ns | 15.19M ops/sec | 0 B |
-| `GetEntryOrDefault` | 101 ns | 9.87M ops/sec | 0 B |
-| `GetNextOrDefault` | 184 ns | 5.44M ops/sec | 40 B |
-| `Update` | 431 ns | 2.32M ops/sec | 208 B |
-| `Add` | 1,013 ns | 987K ops/sec | 216 B |
+| `GetFirstOrDefault` | 68-74 ns | **13.4-14.6M ops/sec** | 0 B |
+| `GetEntryOrDefault` | 98-124 ns | **8.1-10.2M ops/sec** | 0 B |
+| `GetNextOrDefault` | 193-216 ns | **4.6-5.2M ops/sec** | 0 B |
+| `Update` | 416-435 ns | **2.3-2.4M ops/sec** | 155 B |
+| `Add` | 1,093-1,128 ns | **886K-915K ops/sec** | 256-288 B |
 
-**Workload Scenarios:**
+### Workload Performance
 
-| Workload | Throughput | Description |
-|----------|------------|-------------|
-| Read-Only | 7.6-15M ops/sec | `GetEntry`/`GetFirst` operations |
-| Write-Only (Add) | ~1M ops/sec | Append-only logging |
-| Write-Only (Update) | ~2.3M ops/sec | In-place modifications |
-| Mixed (80/20 R/W) | 500-580K ops/sec | Read-heavy web apps |
-| Mixed (50/50 R/W) | 700-830K ops/sec | Balanced workloads |
+| Workload | Throughput |
+|----------|------------|
+| Read-Only | 4.6-14.6M ops/sec | 
+| Write-Only (Update) | 2.3-2.4M ops/sec | 
+| Write-Only (Add) | 886K-915K ops/sec | 
+| Mixed (50/50 R/W) | 677K-742K ops/sec | 
+| Mixed (80/20 R/W) | 461K-548K ops/sec | 
+
+### vs. FusionCache
+
+| Operation | Baubit | FusionCache | Winner |
+|-----------|--------|-------------|--------|
+| Read | 100-137 ns | 297-299 ns | **Baubit 2.2-3.0x faster** |
+| Update | 129-134 ns | 432-459 ns | **Baubit 3.3-3.4x faster** |
+| Add | 662-792 ns | 813-864 ns | **Baubit 1.0-1.3x faster** |
+| Mixed 80/20 | 1,467-1,775 ns | 2,002-2,227 ns | **Baubit 1.3-1.4x faster** |
+| Mixed 50/50 | 943-1,058 ns | 1,398-1,403 ns | **Baubit 1.3-1.5x faster** |
 
 **Characteristics:**
-- Zero allocations on read operations (`GetFirst`, `GetEntry`)
-- Read operations 10-100x faster than writes
-- Consistent performance scaling (1K → 10K entries)
-- No lock contention in single-threaded scenarios
+- Zero allocations on reads
+- O(1) lookups and head/tail access
+- Faster than FusionCache across all comparable operations
 
-See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) for detailed analysis.
+See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) for detailed benchmark data.
+
+## Thread Safety
+
+`OrderedCache<T>` is designed for concurrent access:
+- Multiple readers can access the cache simultaneously.
+- Writers (add/update/remove) are synchronized to prevent conflicting changes.
+
+**Caveats:**
+- Operations on the same entry (e.g., update) are not atomic. Consumers must handle potential conflicts.
+- Enumerating events (`IAsyncEnumerable`) is safe even if new events are added concurrently.
 
 ## Use Cases
 

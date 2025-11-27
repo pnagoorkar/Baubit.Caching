@@ -168,7 +168,7 @@
 
             // Use a TaskCompletionSource to ensure the async wait is properly started
             var waitStarted = new TaskCompletionSource<bool>();
-            
+
             // Act
             var nextIdTask = Task.Run(async () =>
             {
@@ -179,10 +179,10 @@
 
             // Wait for the async operation to actually start and register in the waiting room
             await waitStarted.Task;
-            
+
             // Add a small delay to ensure Join() has been called and _numOfGuests incremented
             await Task.Delay(100);
-            
+
             metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
 
@@ -375,21 +375,21 @@
         {
             // Arrange
             var metadata = new Caching.InMemory.Metadata { Configuration = new Caching.Configuration { RunAdaptiveResizing = true } };
-            
+
             // Add first entry
             metadata.GenerateNextId(out var id1);
             metadata.AddTail(id1);
 
             // Start an async wait (this will join the waiting room)
             var nextIdTask = metadata.GetNextIdAsync(id1, CancellationToken.None);
-            
+
             // Give the task a moment to register in the waiting room
             await Task.Delay(10);
-            
+
             // Add second entry while there's a waiter - this should increment room count
             metadata.GenerateNextId(out var id2);
             metadata.AddTail(id2);
-            
+
             // Wait for the async operation to complete
             await nextIdTask;
 
@@ -413,8 +413,13 @@
             // Act
             metadata.Dispose();
 
-            // Assert - No exception thrown
-            Assert.Equal(1, metadata.Count); // Data should still be present after dispose
+            // Assert - Cannot access properties after dispose
+            Assert.Null(metadata.Configuration);
+            Assert.Null(metadata.CurrentOrder);
+            Assert.Null(metadata.HeadId);
+            Assert.Null(metadata.IdNodeMap);
+            Assert.Null(metadata.TailId);
+            Assert.Throws<NullReferenceException>(() => metadata.Count);
         }
 
         [Fact]
