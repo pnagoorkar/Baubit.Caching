@@ -12,7 +12,7 @@ This is part of the **Baubit framework** - a collection of focused, componentize
 
 ## Technology Stack
 
-- **Target Framework**: .NET Standard 2.0 (for broad compatibility) and .NET 9.0 (for modern features)
+- **Target Framework**: .NET Standard 2.0 (for broad compatibility)
 - **Language**: C# with language features compatible with .NET Standard 2.0
 - **Testing**: xUnit with comprehensive unit and integration tests
 - **CI/CD**: CircleCI with automated build, test, and publish pipelines
@@ -28,7 +28,7 @@ All Baubit components follow a consistent structure:
 Baubit.{ComponentName}/
 ├── Baubit.{ComponentName}/              # Main library project
 │   ├── {Core classes and interfaces}
-│   └── Baubit.{ComponentName}.csproj    # Multi-targets .NET Standard 2.0 and .NET 9.0
+│   └── Baubit.{ComponentName}.csproj    # Targets .NET Standard 2.0
 ├── Baubit.{ComponentName}.Test/        # Test project
 │   ├── {Test classes}
 │   └── Baubit.{ComponentName}.Test.csproj
@@ -98,7 +98,6 @@ Baubit.{ComponentName}/
 3. **Performance**
    - Minimize allocations - prefer value types and object pooling
    - Avoid LINQ in hot paths - use for loops for performance-critical code
-   - Use `Span<T>` and `Memory<T>` only when targeting .NET 9.0 specifically (use preprocessor directives)
    - Profile before optimizing - measure don't guess
    - **Note**: Stack allocation and advanced memory APIs are limited in .NET Standard 2.0
 
@@ -231,7 +230,7 @@ Before committing code:
 - [ ] No new external dependencies (or justified if necessary)
 - [ ] Code coverage meets minimum requirements
 - [ ] README.md updated if public API changed
-- [ ] Code compiles for both .NET Standard 2.0 and .NET 9.0 targets
+- [ ] Code compiles for .NET Standard 2.0 target
 
 ## Common Development Tasks
 
@@ -250,7 +249,7 @@ Before committing code:
 
 1. Always add tests for modified behavior
 2. Update documentation to reflect changes
-3. Test against both .NET Standard 2.0 and .NET 9.0 targets
+3. Test against .NET Standard 2.0 target
 
 ### Adding Dependencies
 
@@ -268,10 +267,9 @@ Before committing code:
 1. Profile first - identify bottlenecks with data
 2. Write benchmarks using BenchmarkDotNet (optional but recommended)
 3. Test before and after performance changes
-4. Document performance improvements in PR
+4. Document performance improvements in PR and readme files. Always include the ops/sec column.
 5. Ensure optimizations don't sacrifice readability or maintainability
 6. Consider caching, object pooling, or lazy initialization patterns
-7. Use preprocessor directives for target-specific optimizations
 
 ## Documentation Standards
 
@@ -329,4 +327,4 @@ This document should evolve with the project. When you identify:
 
 ---
 
-**Remember**: Baubit components are designed to be production-grade, high-performance building blocks that support broad compatibility through .NET Standard 2.0 while leveraging modern features when targeting .NET 9.0. Every line of code should reflect this commitment to quality, simplicity, and reliability.
+**Remember**: Baubit components are designed to be production-grade, high-performance building blocks that support broad compatibility through .NET Standard 2.0. Every line of code should reflect this commitment to quality, simplicity, and reliability.

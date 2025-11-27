@@ -1,112 +1,133 @@
 # OrderedCache Performance Results
 
-**Date:** November 23, 2025  
-**System:** Intel Core Ultra 9 185H @ 2.50GHz, .NET 9.0.11  
+**System:** Intel Core Ultra 9 185H @ 2.50GHz, Windows 11 (10.0.26200.7171)  
+**Runtime:** .NET 9.0.11, X64 RyuJIT x86-64-v3  
+**Date:** Nov 27, 2025
 
 ---
 
-## Throughput Summary (Operations per Second)
+## FusionCache Comparison
+
+### Read Operations (Direct Lookup by ID/Key)
+
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **10.00M** | **1** |
+| FusionCache | 1,000 | 3.34M | 3 |
+| **Baubit** | 10,000 | **7.30M** | **2** |
+| FusionCache | 10,000 | 3.37M | 3 |
+
+**Baubit 2.2-3.0x faster**
+
+### Update Operations (Modify Existing Entry)
+
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **7.75M** | **2** |
+| FusionCache | 1,000 | 2.31M | 4 |
+| **Baubit** | 10,000 | **7.48M** | **2** |
+| FusionCache | 10,000 | 2.18M | 4 |
+
+**Baubit 3.3-3.4x faster**
+
+### Write/Add Operations (New Entry Creation)
+
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **1.51M** | **5** |
+| FusionCache | 1,000 | 1.16M | 5 |
+| **Baubit** | 10,000 | **1.26M** | **5** |
+| FusionCache | 10,000 | 1.23M | 5 |
+
+**Baubit 1.0-1.3x faster**
+
+### Mixed Workload: 80% Read / 20% Write
+
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **682K** | **6** |
+| FusionCache | 1,000 | 500K | 7 |
+| **Baubit** | 10,000 | **563K** | **7** |
+| FusionCache | 10,000 | 449K | 7 |
+
+**Baubit 1.3-1.4x faster**
+
+### Mixed Workload: 50% Read / 50% Write
+
+| Library | Cache Size | Ops/Sec | Rank |
+|---------|------------|---------|------|
+| **Baubit** | 1,000 | **1.06M** | **5** |
+| FusionCache | 1,000 | 713K | 6 |
+| **Baubit** | 10,000 | **945K** | **5** |
+| FusionCache | 10,000 | 715K | 6 |
+
+**Baubit 1.3-1.5x faster**
+
+---
+
+## OrderedCache Standalone Performance
 
 ### Read-Only Workloads
 
-| Operation | Cache Size | Mean Latency | **Ops/Second** | Memory |
-|-----------|------------|--------------|----------------|--------|
-| GetEntryOrDefault | 1,000 | 101.29 ns | **9.87M ops/sec** | 0 B |
-| GetEntryOrDefault | 10,000 | 131.36 ns | **7.61M ops/sec** | 0 B |
-| GetFirstOrDefault | 1,000 | 65.84 ns | **15.19M ops/sec** | 0 B |
-| GetFirstOrDefault | 10,000 | 68.60 ns | **14.58M ops/sec** | 0 B |
-| GetNextOrDefault | 1,000 | 183.74 ns | **5.44M ops/sec** | 40 B |
-| GetNextOrDefault | 10,000 | 241.53 ns | **4.14M ops/sec** | 40 B |
-
-**Best Read Performance:** **15.19M operations/second** (GetFirstOrDefault)  
-**Typical Read Performance:** **7.6-9.9M operations/second** (GetEntryOrDefault)
-
----
+| Operation | Cache Size | Ops/Sec | Rank |
+|-----------|------------|---------|------|
+| GetFirstOrDefault | 1,000 | **14.60M** | **1** |
+| GetFirstOrDefault | 10,000 | **13.44M** | **1** |
+| GetEntryOrDefault | 1,000 | **10.24M** | **2** |
+| GetEntryOrDefault | 10,000 | **8.08M** | **3** |
+| GetNextOrDefault | 1,000 | **5.17M** | **4** |
+| GetNextOrDefault | 10,000 | **4.63M** | **4** |
 
 ### Write-Only Workloads
 
-| Operation | Cache Size | Mean Latency | **Ops/Second** | Memory |
-|-----------|------------|--------------|----------------|--------|
-| Add | 1,000 | 1,012.68 ns | **987K ops/sec** | 216 B |
-| Add | 10,000 | 963.98 ns | **1.04M ops/sec** | 248 B |
-| Update | 1,000 | 430.50 ns | **2.32M ops/sec** | 208 B |
-| Update | 10,000 | 487.10 ns | **2.05M ops/sec** | 208 B |
-
-**Add Performance:** **~1M operations/second**  
-**Update Performance:** **~2.2M operations/second** (2.2x faster than Add)
-
----
+| Operation | Cache Size | Ops/Sec | Rank |
+|-----------|------------|---------|------|
+| Update | 1,000 | **2.40M** | **5** |
+| Update | 10,000 | **2.30M** | **5** |
+| Add | 1,000 | **915K** | **6** |
+| Add | 10,000 | **886K** | **6** |
 
 ### Mixed Workloads
 
-| Scenario | Cache Size | Mean Latency | **Ops/Second** | Memory |
-|----------|------------|--------------|----------------|--------|
-| 80% Read / 20% Write | 1,000 | 1,721.93 ns | **581K ops/sec** | 216 B |
-| 80% Read / 20% Write | 10,000 | 1,980.07 ns | **505K ops/sec** | 216 B |
-| 50% Read / 50% Write | 1,000 | 1,209.09 ns | **827K ops/sec** | 216 B |
-| 50% Read / 50% Write | 10,000 | 1,416.42 ns | **706K ops/sec** | 216 B |
-
-**Read-Heavy (80/20):** **~500-580K operations/second**  
-**Balanced (50/50):** **~700-830K operations/second**
-
----
-
-## Key Findings
-
-### ? Strengths
-1. **Excellent Read Performance**: 7.6-15M ops/sec for direct access
-2. **Zero Read Allocations**: GetFirst/GetEntry operations
-3. **Fast Updates**: 2.05-2.32M ops/sec
-4. **Consistent Scaling**: Performance remains stable from 1K to 10K entries
-
-### ?? Performance Profile
-- **Read Operations**: 10-100x faster than writes
-- **GetFirst**: Fastest read operation (~15M ops/sec)
-- **GetEntry**: Typical read performance (~8-10M ops/sec)
-- **Add**: Slowest due to locking + metadata updates (~1M ops/sec)
-- **Update**: 2x faster than Add (~2M ops/sec)
-
-### ?? Use Case Recommendations
-
-| Your Workload | Expected Throughput | Suitability |
-|---------------|---------------------|-------------|
-| **Read-Heavy (90%+ reads)** | 5-10M ops/sec | ? Excellent |
-| **Balanced (50/50)** | 700-830K ops/sec | ? Very Good |
-| **Write-Heavy (70%+ writes)** | 500-700K ops/sec | ? Good |
-| **Write-Only** | ~1M ops/sec (Add) | ? Good |
+| Workload | Cache Size | Ops/Sec | Rank |
+|----------|------------|---------|------|
+| 50% Read / 50% Write | 1,000 | **742K** | **7** |
+| 50% Read / 50% Write | 10,000 | **677K** | **7** |
+| 80% Read / 20% Write | 1,000 | **548K** | **8** |
+| 80% Read / 20% Write | 10,000 | **461K** | **9** |
 
 ---
 
 ## Raw Benchmark Data
 
+### vs. FusionCache
+
 ```
 BenchmarkDotNet v0.15.6, Windows 11 (10.0.26200.7171)
 Intel Core Ultra 9 185H 2.50GHz, 1 CPU, 22 logical and 16 physical cores
-.NET SDK 10.0.100
-  [Host]     : .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
-  Job-VAIYHK : .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
+.NET SDK 10.0.100, .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
 
-InvocationCount=10000  IterationCount=10  WarmupCount=3  
-
- Method                         | CacheSize | Mean        | Error      | StdDev     | Allocated |
-------------------------------- |---------- |------------:|-----------:|-----------:|----------:|
- 'Read-Only: GetEntryOrDefault' | 1000      |   101.29 ns |  12.839 ns |   7.640 ns |         - |
- 'Read-Only: GetFirstOrDefault' | 1000      |    65.84 ns |   4.474 ns |   2.959 ns |         - |
- 'Read-Only: GetNextOrDefault'  | 1000      |   183.74 ns |  12.924 ns |   6.760 ns |      40 B |
- 'Write-Only: Add'              | 1000      | 1,012.68 ns | 176.509 ns |  92.318 ns |     216 B |
- 'Write-Only: Update'           | 1000      |   430.50 ns |  46.423 ns |  27.626 ns |     208 B |
- 'Mixed: 80% Read, 20% Write'   | 1000      | 1,721.93 ns | 442.617 ns | 292.764 ns |     216 B |
- 'Mixed: 50% Read, 50% Write'   | 1000      | 1,209.09 ns | 221.730 ns | 146.661 ns |     216 B |
- 'Read-Only: GetEntryOrDefault' | 10000     |   131.36 ns |  25.243 ns |  16.697 ns |         - |
- 'Read-Only: GetFirstOrDefault' | 10000     |    68.60 ns |   7.244 ns |   4.792 ns |         - |
- 'Read-Only: GetNextOrDefault'  | 10000     |   241.53 ns |  19.529 ns |  12.917 ns |      40 B |
- 'Write-Only: Add'              | 10000     |   963.98 ns | 118.095 ns |  70.276 ns |     248 B |
- 'Write-Only: Update'           | 10000     |   487.10 ns |  18.918 ns |  12.513 ns |     208 B |
- 'Mixed: 80% Read, 20% Write'   | 10000     | 1,980.07 ns | 665.605 ns | 440.257 ns |     216 B |
- 'Mixed: 50% Read, 50% Write'   | 10000     | 1,416.42 ns | 333.190 ns | 220.385 ns |     216 B |
+| Method                             | Categories | CacheSize | Mean        | Rank | Allocated |
+|----------------------------------- |----------- |---------- |------------:|-----:|----------:|
+| 'Baubit: Read by ID'               | Read       | 1000      |    99.98 ns |    1 |         - |
+| 'FusionCache: Read by Key'         | Read       | 1000      |   299.45 ns |    3 |         - |
+| 'Baubit: Read by ID'               | Read       | 10000     |   137.07 ns |    2 |         - |
+| 'FusionCache: Read by Key'         | Read       | 10000     |   296.98 ns |    3 |         - |
+| 'Baubit: Update Existing'          | Update     | 1000      |   129.05 ns |    2 |      99 B |
+| 'FusionCache: Update Existing'     | Update     | 1000      |   432.28 ns |    4 |     224 B |
+| 'Baubit: Update Existing'          | Update     | 10000     |   133.64 ns |    2 |      99 B |
+| 'FusionCache: Update Existing'     | Update     | 10000     |   458.83 ns |    4 |     224 B |
+| 'Baubit: Add New Entry'            | Write      | 1000      |   662.07 ns |    5 |     224 B |
+| 'FusionCache: Set New Entry'       | Write      | 1000      |   863.58 ns |    5 |     328 B |
+| 'Baubit: Add New Entry'            | Write      | 10000     |   791.91 ns |    5 |     224 B |
+| 'FusionCache: Set New Entry'       | Write      | 10000     |   813.14 ns |    5 |     328 B |
+| 'Baubit: 80% Read, 20% Write'      | Mixed      | 1000      | 1,466.29 ns |    6 |     192 B |
+| 'FusionCache: 80% Read, 20% Write' | Mixed      | 1000      | 2,001.61 ns |    7 |     320 B |
+| 'Baubit: 50% Read, 50% Write'      | Mixed      | 1000      |   943.41 ns |    5 |     192 B |
+| 'FusionCache: 50% Read, 50% Write' | Mixed      | 1000      | 1,403.34 ns |    6 |     320 B |
+| 'Baubit: 80% Read, 20% Write'      | Mixed      | 10000     | 1,774.83 ns |    7 |     216 B |
+| 'FusionCache: 80% Read, 20% Write' | Mixed      | 10000     | 2,227.46 ns |    7 |     320 B |
+| 'Baubit: 50% Read, 50% Write'      | Mixed      | 10000     | 1,058.04 ns |    5 |     192 B |
+| 'FusionCache: 50% Read, 50% Write' | Mixed      | 10000     | 1,398.59 ns |    6 |     320 B |
 ```
 
----
-
-**Runtime:** 7.26 seconds  
-**Benchmarks Executed:** 14
