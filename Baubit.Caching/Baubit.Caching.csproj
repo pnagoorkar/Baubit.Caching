@@ -26,12 +26,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Baubit.Tasks" Version="2025.48.1" />
+    <PackageReference Include="Baubit.Tasks" Version="2025.49.1" />
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.5" />
     <PackageReference Include="Baubit.Collections" Version="2025.48.2" />
     <PackageReference Include="Baubit.Identity" Version="2025.48.2" />
-    <PackageReference Include="Baubit.Configuration" Version="2025.48.1" />
+    <PackageReference Include="Baubit.Configuration" Version="2025.48.3" />
   </ItemGroup>
 
 </Project>
