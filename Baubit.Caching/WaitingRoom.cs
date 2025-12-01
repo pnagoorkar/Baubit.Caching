@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Baubit.Tasks;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,10 +23,7 @@ namespace Baubit.Caching
             Interlocked.Increment(ref _numOfGuests);
             try
             {
-                using (cancellationToken.Register(() => tcs.TrySetCanceled()))
-                {
-                    return await tcs.Task.ConfigureAwait(false);
-                }
+                return await tcs.Task.WaitAsync(cancellationToken);
             }
             finally
             {
