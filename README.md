@@ -8,6 +8,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)<br/>
 [![Known Vulnerabilities](https://snyk.io/test/github/pnagoorkar/Baubit.Caching/badge.svg)](https://snyk.io/test/github/pnagoorkar/Baubit.Caching)
 
+**DI Extension**: [Baubit.Caching.DI](https://github.com/pnagoorkar/Baubit.Caching.DI)
+
 Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
 
 #### **In 30 seconds:** 
