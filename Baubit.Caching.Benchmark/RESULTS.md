@@ -71,34 +71,34 @@
 
 | Library | Item Count | Ops/Sec | Rank |
 |---------|-----------|---------|------|
-| **Channel** | 1,000 | **20.65M** | **1** |
-| OrderedCache | 1,000 | 6.09M | 4 |
-| **Channel** | 10,000 | **21.21M** | **1** |
-| OrderedCache | 10,000 | 5.24M | 4 |
+| **Channel** | 1,000 | **20.63M** | **1** |
+| OrderedCache | 1,000 | 6.01M | 4 |
+| **Channel** | 10,000 | **20.78M** | **1** |
+| OrderedCache | 10,000 | 5.24M | 5 |
 
-**Channel 3.4-4.1x faster** - Channel<T> is optimized for sequential access in producer-consumer scenarios.
+**Channel 3.4-3.9x faster** - Channel<T> is optimized for sequential access in producer-consumer scenarios.
 
 ### Write Operations
 
 | Library | Item Count | Ops/Sec | Rank |
 |---------|-----------|---------|------|
-| **Channel** | 1,000 | **14.28M** | **2** |
-| OrderedCache | 1,000 | 365K | 6 |
-| **Channel** | 10,000 | **13.61M** | **2** |
-| OrderedCache | 10,000 | 370K | 6 |
+| **Channel** | 1,000 | **14.22M** | **2** |
+| OrderedCache | 1,000 | 364K | 7 |
+| **Channel** | 10,000 | **14.47M** | **2** |
+| OrderedCache | 10,000 | 392K | 7 |
 
-**Channel 37.3-39.1x faster** - Channel<T> has minimal overhead for simple enqueue operations.
+**Channel 36.2-39.1x faster** - Channel<T> has minimal overhead for simple enqueue operations.
 
 ### Mixed Workload: 50% Read / 50% Write
 
 | Library | Item Count | Ops/Sec | Rank |
 |---------|-----------|---------|------|
-| **Channel** | 1,000 | **8.98M** | **3** |
-| OrderedCache | 1,000 | 321K | 6 |
-| **Channel** | 10,000 | **9.17M** | **3** |
-| OrderedCache | 10,000 | 314K | 6 |
+| **Channel** | 1,000 | **7.96M** | **3** |
+| OrderedCache | 1,000 | 319K | 7 |
+| **Channel** | 10,000 | **7.51M** | **3** |
+| OrderedCache | 10,000 | 308K | 7 |
 
-**Channel 28.0-28.6x faster** - Channel<T> excels in pure producer-consumer patterns.
+**Channel 23.5-24.9x faster** - Channel<T> excels in pure producer-consumer patterns.
 
 ### Performance Trade-offs
 
@@ -115,7 +115,7 @@
 - Persistent storage and two-tier caching
 - Deletion-resilient iteration
 
-**Key Insight:** Channel<T> is 28-39x faster for sequential producer-consumer patterns, but OrderedCache<T> provides rich features like random access, ordered enumeration, and persistent storage that justify its overhead for event sourcing, audit logs, and CDC pipelines.
+**Key Insight:** Channel<T> is 24-39x faster for sequential producer-consumer patterns, but OrderedCache<T> provides rich features like random access, ordered enumeration, and persistent storage that justify its overhead for event sourcing, audit logs, and CDC pipelines.
 
 ---
 

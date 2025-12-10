@@ -115,8 +115,18 @@ public class ChannelComparisonBenchmarks
     [BenchmarkCategory("Sequential")]
     public void OrderedCache_SequentialRead()
     {
-        var id = _cacheEntryIds[_readIndex++ % _cacheEntryIds.Count];
-        _cache!.GetNextOrDefault(id, out _);
+        // Get sequential entry starting from first, advancing through the cache
+        if (_readIndex == 0 || _readIndex >= _cacheEntryIds.Count)
+        {
+            _cache!.GetFirstOrDefault(out _);
+            _readIndex = 0;
+        }
+        else
+        {
+            var id = _cacheEntryIds[_readIndex - 1];
+            _cache!.GetNextOrDefault(id, out _);
+        }
+        _readIndex++;
     }
 
     // ==================== MIXED WORKLOAD BENCHMARKS ====================
@@ -137,8 +147,11 @@ public class ChannelComparisonBenchmarks
     [BenchmarkCategory("Mixed")]
     public void Channel_Mixed_50Read_50Write()
     {
-        // 1 read
-        _channel!.Reader.TryRead(out _);
+        // 1 read - write back to maintain queue size for fair comparison
+        if (_channel!.Reader.TryRead(out var value))
+        {
+            _channel.Writer.TryWrite(value);
+        }
 
         // 1 write
         _channel!.Writer.TryWrite($"Mixed_{_writeCounter++}");
