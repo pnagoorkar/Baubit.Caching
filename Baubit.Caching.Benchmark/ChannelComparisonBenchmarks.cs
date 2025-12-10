@@ -101,6 +101,10 @@ public class ChannelComparisonBenchmarks
     [BenchmarkCategory("Read")]
     public void Channel_Read()
     {
+        // Note: Writing values back maintains queue state for continuous benchmarking.
+        // This pattern simulates steady-state operation where the queue is neither
+        // growing nor shrinking, enabling fair comparison with OrderedCache which
+        // retains items for repeated reads.
         if (_channel!.Reader.TryRead(out var value))
         {
             // Successfully read, write it back to maintain queue size
@@ -156,6 +160,9 @@ public class ChannelComparisonBenchmarks
     [BenchmarkCategory("Mixed")]
     public void Channel_Mixed_50Read_50Write()
     {
+        // Note: Writing read values back simulates steady-state producer-consumer
+        // pattern where queue size remains stable. This represents realistic
+        // continuous operation scenarios.
         // 1 read - write back to maintain queue size for fair comparison
         if (_channel!.Reader.TryRead(out var value))
         {
