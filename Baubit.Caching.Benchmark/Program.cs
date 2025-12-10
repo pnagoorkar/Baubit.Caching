@@ -6,11 +6,12 @@ class Program
 {
     static void Main(string[] args)
     {
-        // Run both benchmark suites
+        // Run all benchmark suites
         BenchmarkRunner.Run(new[]
         {
             typeof(OrderedCacheBenchmarks),
-            typeof(FusionCacheComparisonBenchmarks)
+            typeof(FusionCacheComparisonBenchmarks),
+            typeof(ChannelComparisonBenchmarks)
         }, args: args);
     }
 }
