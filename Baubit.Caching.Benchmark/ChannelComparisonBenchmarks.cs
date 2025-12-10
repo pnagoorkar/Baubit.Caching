@@ -1,7 +1,5 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
-using BenchmarkDotNet.Reports;
-using BenchmarkDotNet.Running;
 using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Threading.Channels;
@@ -23,6 +21,7 @@ public class ChannelComparisonBenchmarks
     private readonly List<Guid> _cacheEntryIds = new();
     private int _readIndex = 0;
     private int _writeCounter = 0;
+    private Guid? _sequentialReadCurrentId = null;
 
     [Params(1_000, 10_000)]
     public int ItemCount { get; set; }
@@ -115,18 +114,28 @@ public class ChannelComparisonBenchmarks
     [BenchmarkCategory("Sequential")]
     public void OrderedCache_SequentialRead()
     {
-        // Get sequential entry starting from first, advancing through the cache
-        if (_readIndex == 0 || _readIndex >= _cacheEntryIds.Count)
+        // Sequential forward iteration through the cache
+        if (_sequentialReadCurrentId == null)
         {
-            _cache!.GetFirstOrDefault(out _);
-            _readIndex = 0;
+            // Start from the first entry
+            if (_cache!.GetFirstOrDefault(out var firstEntry) && firstEntry != null)
+            {
+                _sequentialReadCurrentId = firstEntry.Id;
+            }
         }
         else
         {
-            var id = _cacheEntryIds[_readIndex - 1];
-            _cache!.GetNextOrDefault(id, out _);
+            // Get next entry from current position
+            if (_cache!.GetNextOrDefault(_sequentialReadCurrentId, out var nextEntry) && nextEntry != null)
+            {
+                _sequentialReadCurrentId = nextEntry.Id;
+            }
+            else
+            {
+                // Reached end, wrap around to start
+                _sequentialReadCurrentId = null;
+            }
         }
-        _readIndex++;
     }
 
     // ==================== MIXED WORKLOAD BENCHMARKS ====================
