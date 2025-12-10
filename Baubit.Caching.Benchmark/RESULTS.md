@@ -65,6 +65,60 @@
 
 ---
 
+## Channel<T> Comparison
+
+### Read Operations
+
+| Library | Item Count | Ops/Sec | Rank |
+|---------|-----------|---------|------|
+| **Channel** | 1,000 | **20.65M** | **1** |
+| OrderedCache | 1,000 | 6.09M | 4 |
+| **Channel** | 10,000 | **21.21M** | **1** |
+| OrderedCache | 10,000 | 5.24M | 4 |
+
+**Channel 3.4-4.1x faster** - Channel<T> is optimized for sequential access in producer-consumer scenarios.
+
+### Write Operations
+
+| Library | Item Count | Ops/Sec | Rank |
+|---------|-----------|---------|------|
+| **Channel** | 1,000 | **14.28M** | **2** |
+| OrderedCache | 1,000 | 365K | 6 |
+| **Channel** | 10,000 | **13.61M** | **2** |
+| OrderedCache | 10,000 | 370K | 6 |
+
+**Channel 37.3-39.1x faster** - Channel<T> has minimal overhead for simple enqueue operations.
+
+### Mixed Workload: 50% Read / 50% Write
+
+| Library | Item Count | Ops/Sec | Rank |
+|---------|-----------|---------|------|
+| **Channel** | 1,000 | **8.98M** | **3** |
+| OrderedCache | 1,000 | 321K | 6 |
+| **Channel** | 10,000 | **9.17M** | **3** |
+| OrderedCache | 10,000 | 314K | 6 |
+
+**Channel 28.0-28.6x faster** - Channel<T> excels in pure producer-consumer patterns.
+
+### Performance Trade-offs
+
+**When to use Channel<T>:**
+- Pure producer-consumer scenarios (FIFO queue)
+- No need for random access by ID
+- Minimal memory overhead is critical
+- Sequential-only access pattern
+
+**When to use OrderedCache<T>:**
+- Need random access by ID (O(1) lookups)
+- Time-ordered GuidV7 identifiers required
+- Multi-consumer with different speeds
+- Persistent storage and two-tier caching
+- Deletion-resilient iteration
+
+**Key Insight:** Channel<T> is 28-39x faster for sequential producer-consumer patterns, but OrderedCache<T> provides rich features like random access, ordered enumeration, and persistent storage that justify its overhead for event sourcing, audit logs, and CDC pipelines.
+
+---
+
 ## OrderedCache Standalone Performance
 
 ### Read-Only Workloads
