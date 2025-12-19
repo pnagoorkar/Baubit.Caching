@@ -434,7 +434,7 @@ var config = new Configuration { EvictAfterEveryX = 100 };
 
 **Configuration Options:**
 ```csharp
-public class Configuration : AConfiguration
+public class Configuration : Baubit.Configuration.Configuration
 {
     bool RunAdaptiveResizing { get; init; } = false;  // Enable L1 dynamic sizing
     int AdaptionWindowMS { get; init; } = 2_000;      // Resize evaluation interval
