@@ -3,7 +3,7 @@ using System;
 
 namespace Baubit.Caching
 {
-    public abstract class AStore<TValue> : IStore<TValue>
+    public abstract class StoreBase<TValue> : IStore<TValue>
     {
         public bool Uncapped { get => !TargetCapacity.HasValue; }
         public long? MinCapacity { get; set; } = null;
@@ -25,16 +25,16 @@ namespace Baubit.Caching
 
         public abstract Guid? TailId { get; }
 
-        private ILogger<AStore<TValue>> _logger;
+        private ILogger<StoreBase<TValue>> _logger;
         private bool disposedValue;
 
-        public AStore(long? minCap,
-                      long? maxCap,
-                      ILoggerFactory loggerFactory)
+        public StoreBase(long? minCap,
+                         long? maxCap,
+                         ILoggerFactory loggerFactory)
         {
             TargetCapacity = MinCapacity = minCap;
             MaxCapacity = maxCap;
-            _logger = loggerFactory.CreateLogger<AStore<TValue>>();
+            _logger = loggerFactory.CreateLogger<StoreBase<TValue>>();
         }
 
         public abstract bool Add(IEntry<TValue> entry);

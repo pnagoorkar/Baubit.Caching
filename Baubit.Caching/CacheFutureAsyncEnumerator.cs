@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Baubit.Caching
 {
-    public class CacheFutureAsyncEnumerator<TValue> : ACacheAsyncEnumerator<TValue>
+    public class CacheFutureAsyncEnumerator<TValue> : CacheAsyncEnumeratorBase<TValue>
     {
         public CacheFutureAsyncEnumerator(IOrderedCache<TValue> cache,
                                           Action<ICacheEnumerator> onDispose,
