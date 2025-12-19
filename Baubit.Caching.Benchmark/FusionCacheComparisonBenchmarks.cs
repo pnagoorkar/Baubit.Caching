@@ -40,8 +40,8 @@ public class FusionCacheComparisonBenchmarks
         };
 
         var metadata = new Metadata { Configuration = config };
-        var l1Store = new Store<string>(CacheSize / 10, CacheSize / 10, NullLoggerFactory.Instance);
-        var l2Store = new Store<string>(NullLoggerFactory.Instance);
+        var l1Store = new InMemory.Store<string>(CacheSize / 10, CacheSize / 10, NullLoggerFactory.Instance);
+        var l2Store = new InMemory.Store<string>(NullLoggerFactory.Instance);
 
         _baubitCache = new OrderedCache<string>(
             config,

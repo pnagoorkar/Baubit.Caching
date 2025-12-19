@@ -15,7 +15,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
         {
             var config = new Caching.Configuration();
             var metadata = new Metadata();
-            var l2Store = new Store<string>(_loggerFactory);
+            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
             return new Caching.OrderedCache<string>(config, null, l2Store, metadata, _loggerFactory);
         }
 
