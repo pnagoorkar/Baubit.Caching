@@ -31,7 +31,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.5" />
     <PackageReference Include="Baubit.Collections" Version="2025.48.2" />
     <PackageReference Include="Baubit.Identity" Version="2025.48.2" />
-    <PackageReference Include="Baubit.Configuration" Version="2025.48.3" />
+    <PackageReference Include="Baubit.Configuration" Version="2025.51.2" />
   </ItemGroup>
 
 </Project>
