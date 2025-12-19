@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Baubit.Caching.Abstract
+namespace Baubit.Caching
 {
-    public abstract class CacheAsyncEnumerator<TValue> : IAsyncEnumerator<IEntry<TValue>>, ICacheEnumerator
+    public abstract class BaseCacheAsyncEnumerator<TValue> : IAsyncEnumerator<IEntry<TValue>>, ICacheEnumerator
     {
         public IEntry<TValue> Current { get; protected set; }
         public Guid? CurrentId => Current?.Id;
@@ -14,7 +14,7 @@ namespace Baubit.Caching.Abstract
         private Action<ICacheEnumerator> _onDispose;
         private CancellationToken _cancellationToken;
         private CancellationTokenRegistration cancellationTokenRegistration;
-        public CacheAsyncEnumerator(IOrderedCache<TValue> cache,
+        public BaseCacheAsyncEnumerator(IOrderedCache<TValue> cache,
                                     Action<ICacheEnumerator> onDispose,
                                     CancellationToken cancellationToken = default)
         {

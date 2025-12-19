@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 
-namespace Baubit.Caching.Abstract
+namespace Baubit.Caching
 {
     public abstract class Store<TValue> : IStore<TValue>
     {
