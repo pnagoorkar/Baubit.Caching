@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 
-namespace Baubit.Caching
+namespace Baubit.Caching.Abstract
 {
-    public abstract class StoreBase<TValue> : IStore<TValue>
+    public abstract class Store<TValue> : IStore<TValue>
     {
         public bool Uncapped { get => !TargetCapacity.HasValue; }
         public long? MinCapacity { get; set; } = null;
@@ -25,16 +25,16 @@ namespace Baubit.Caching
 
         public abstract Guid? TailId { get; }
 
-        private ILogger<StoreBase<TValue>> _logger;
+        private ILogger<Store<TValue>> _logger;
         private bool disposedValue;
 
-        public StoreBase(long? minCap,
-                         long? maxCap,
-                         ILoggerFactory loggerFactory)
+        public Store(long? minCap,
+                     long? maxCap,
+                     ILoggerFactory loggerFactory)
         {
             TargetCapacity = MinCapacity = minCap;
             MaxCapacity = maxCap;
-            _logger = loggerFactory.CreateLogger<StoreBase<TValue>>();
+            _logger = loggerFactory.CreateLogger<Store<TValue>>();
         }
 
         public abstract bool Add(IEntry<TValue> entry);

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace Baubit.Caching.InMemory
 {
-    public class Store<TValue> : StoreBase<TValue>
+    public class Store<TValue> : Abstract.Store<TValue>
     {
         // Cache the head and tail IDs to avoid O(n) Min/Max operations
         private Guid? _headId;
