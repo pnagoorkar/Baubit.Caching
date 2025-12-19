@@ -1,8 +1,6 @@
-﻿using Baubit.Configuration;
-
-namespace Baubit.Caching
+﻿namespace Baubit.Caching
 {
-    public class Configuration : AConfiguration
+    public class Configuration : Baubit.Configuration.Configuration
     {
         public bool RunAdaptiveResizing { get; set; } = false;
         public int AdaptionWindowMS { get; set; } = 2_000;
