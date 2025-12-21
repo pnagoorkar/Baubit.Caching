@@ -115,6 +115,89 @@ namespace Baubit.Caching.Test.InMemory.Store
         }
 
         [Fact]
+        public void Store_Add_WithValueOnly_AutoGeneratesId_Success()
+        {
+            // Arrange
+            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+
+            // Act
+            var result = store.Add("test value", out var entry);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(entry);
+            Assert.NotEqual(Guid.Empty, entry.Id);
+            Assert.Equal("test value", entry.Value);
+            Assert.NotNull(entry.CreatedOnUTC);
+        }
+
+        [Fact]
+        public void Store_Add_WithValueOnly_MultipleEntries_GeneratesMonotonicIds()
+        {
+            // Arrange
+            var store = new Caching.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+
+            // Act
+            store.Add(1, out var entry1);
+            store.Add(2, out var entry2);
+            store.Add(3, out var entry3);
+
+            // Assert
+            Assert.True(entry1.Id.CompareTo(entry2.Id) < 0);
+            Assert.True(entry2.Id.CompareTo(entry3.Id) < 0);
+            Assert.Equal(1, entry1.Value);
+            Assert.Equal(2, entry2.Value);
+            Assert.Equal(3, entry3.Value);
+        }
+
+        [Fact]
+        public void Store_Add_WithValueOnly_WhenCapacityExceeded_Fails()
+        {
+            // Arrange
+            var store = new Caching.InMemory.Store<string>(2, 2, Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+
+            // Act
+            var result1 = store.Add("first", out _);
+            var result2 = store.Add("second", out _);
+            var result3 = store.Add("third", out _);
+
+            // Assert
+            Assert.True(result1);
+            Assert.True(result2);
+            Assert.False(result3); // Should fail due to capacity
+        }
+
+        [Fact]
+        public void Store_Add_WithValueOnly_NoIdentityGenerator_Fails()
+        {
+            // Arrange - L1 store without identity generator
+            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+
+            // Act
+            var result = store.Add("test value", out var entry);
+
+            // Assert
+            Assert.False(result);
+            Assert.Null(entry);
+        }
+
+        [Fact]
+        public void Store_Add_WithValueOnly_UpdatesHeadAndTail()
+        {
+            // Arrange
+            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+
+            // Act
+            store.Add("first", out var entry1);
+            store.Add("second", out var entry2);
+            store.Add("third", out var entry3);
+
+            // Assert
+            Assert.Equal(entry1.Id, store.HeadId);
+            Assert.Equal(entry3.Id, store.TailId);
+        }
+
+        [Fact]
         public void Store_GetEntryOrDefault_ExistingId_ReturnsEntry()
         {
             // Arrange
