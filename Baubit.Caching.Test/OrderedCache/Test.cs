@@ -17,9 +17,11 @@ namespace Baubit.Caching.Test.OrderedCache
             long? l1MaxCap = null)
         {
             config ??= new Caching.Configuration();
-            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
-            var l1Store = l1MinCap.HasValue ? new Caching.InMemory.Store<string>(l1MinCap, l1MaxCap, _loggerFactory) : null;
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Metadata(config, NullLoggerFactory.Instance);
+            var l2Store = new Caching.InMemory.Store<string>(identityGenerator, _loggerFactory);
+            // L1 store doesn't need an identity generator since it only stores entries created by L2
+            var l1Store = l1MinCap.HasValue ? new Caching.InMemory.Store<string>(l1MinCap, l1MaxCap, null, _loggerFactory) : null;
 
             return new Caching.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
         }
@@ -1216,9 +1218,10 @@ namespace Baubit.Caching.Test.OrderedCache
                 RunAdaptiveResizing = true,
                 AdaptionWindowMS = 100
             };
-            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
-            var l1Store = new Caching.InMemory.Store<string>(_loggerFactory); // Uncapped
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Metadata(config, NullLoggerFactory.Instance);
+            var l2Store = new Caching.InMemory.Store<string>(identityGenerator, _loggerFactory);
+            var l1Store = new Caching.InMemory.Store<string>(null, null, null, _loggerFactory); // Uncapped, no ID gen
 
             using var cache = new Caching.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
 

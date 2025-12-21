@@ -89,10 +89,11 @@ namespace Baubit.Caching
         Task<IEntry<TValue>> GetNextAsync(Guid? id = null, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Asynchronously waits for and returns the first entry (immediately) after the call
+        /// Asynchronously waits for and returns the next entry to be added to the cache.
+        /// Unlike <see cref="GetNextAsync"/>, this method always waits for a new entry regardless of current cache state.
         /// </summary>
         /// <param name="cancellationToken">A token to cancel the wait.</param>
-        /// <returns>A task that completes with the first future entry.</returns>
+        /// <returns>A task that completes with the next entry added after this method is called.</returns>
         Task<IEntry<TValue>> GetFutureFirstOrDefaultAsync(CancellationToken cancellationToken = default);
 
         /// <summary>

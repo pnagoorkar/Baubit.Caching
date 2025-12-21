@@ -7,11 +7,18 @@ namespace Baubit.Caching.Test.InMemory.Metadata
     /// </summary>
     public class Test
     {
+        private readonly Baubit.Identity.IIdentityGenerator idGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+
+        private Guid GenerateNextId()
+        {
+            return idGenerator.GetNext();
+        }
+
         [Fact]
         public void Metadata_Constructor_InitializesEmpty()
         {
             // Arrange & Act
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
 
             // Assert
             Assert.Equal(0, metadata.Count);
@@ -23,8 +30,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_AddTail_FirstEntry_SetsHeadAndTail()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
 
             // Act
             var result = metadata.AddTail(id);
@@ -40,12 +47,12 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_AddTail_MultipleEntries_MaintainsOrder()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
-            metadata.GenerateNextId(out var id3);
+            var id3 = GenerateNextId();
 
             // Act
             metadata.AddTail(id3);
@@ -60,8 +67,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_ContainsKey_ExistingId_ReturnsTrue()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
             metadata.AddTail(id);
 
             // Act
@@ -75,8 +82,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_ContainsKey_NonExistingId_ReturnsFalse()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
 
             // Act
             var result = metadata.ContainsKey(id);
@@ -89,10 +96,10 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_NullId_ReturnsHead()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             // Act
@@ -107,10 +114,10 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_HeadId_ReturnsSecond()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             // Act
@@ -125,10 +132,10 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_TailId_ReturnsNull()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             // Act - Use the actual TailId from metadata
@@ -143,7 +150,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_IdSmallerThanHead_ReturnsHead()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var smallerId = Guid.Parse("05000000-0000-0000-0000-000000000000");
@@ -162,8 +169,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public async Task Metadata_GetNextIdAsync_WhenNoNext_WaitsForNew()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
 
             // Use a TaskCompletionSource to ensure the async wait is properly started
@@ -183,7 +190,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
             // Add a small delay to ensure Join() has been called and _numOfGuests incremented
             await Task.Delay(100);
 
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             var nextId = await nextIdTask;
@@ -196,10 +203,10 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public async Task Metadata_GetNextIdAsync_WhenNextExists_ReturnsImmediately()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             // Act
@@ -210,43 +217,13 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         }
 
         [Fact]
-        public void Metadata_GenerateNextId_FirstCall_ReturnsNewId()
-        {
-            // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-
-            // Act
-            var result = metadata.GenerateNextId(out var id);
-
-            // Assert
-            Assert.True(result);
-            Assert.NotEqual(Guid.Empty, id);
-        }
-
-        [Fact]
-        public void Metadata_GenerateNextId_SubsequentCalls_GenerateIncreasingIds()
-        {
-            // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
-            metadata.AddTail(id1);
-
-            // Act
-            var result = metadata.GenerateNextId(out var id2);
-
-            // Assert
-            Assert.True(result);
-            Assert.True(id2 > id1);
-        }
-
-        [Fact]
         public void Metadata_Remove_ExistingId_Success()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id1);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             // Act
@@ -263,8 +240,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Remove_NonExistingId_ReturnsFalse()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
 
             // Act
             var result = metadata.Remove(id);
@@ -277,8 +254,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Remove_LastEntry_SetsHeadAndTailToNull()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
             metadata.AddTail(id);
 
             // Act
@@ -295,8 +272,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_EmptyStore_ReturnsEmpty()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
 
             // Act
             var result = metadata.GetIdsThrough(id, out var ids);
@@ -310,7 +287,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_IdBeforeHead_ReturnsEmpty()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var smallerId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             metadata.AddTail(id1);
@@ -327,7 +304,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_IdAtTail_ReturnsAllIds()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
@@ -351,7 +328,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_MiddleId_ReturnsPartialList()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
@@ -374,10 +351,10 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public async Task Metadata_ResetRoomCount_ReturnsAndResets()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration { RunAdaptiveResizing = true }, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration { RunAdaptiveResizing = true }, NullLoggerFactory.Instance);
 
             // Add first entry
-            metadata.GenerateNextId(out var id1);
+            var id1 = GenerateNextId();
             metadata.AddTail(id1);
 
             // Start an async wait (this will join the waiting room)
@@ -387,7 +364,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
             await Task.Delay(10);
 
             // Add second entry while there's a waiter - this should increment room count
-            metadata.GenerateNextId(out var id2);
+            var id2 = GenerateNextId();
             metadata.AddTail(id2);
 
             // Wait for the async operation to complete
@@ -406,8 +383,8 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Dispose_CompletesSuccessfully()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            metadata.GenerateNextId(out var id);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id = GenerateNextId();
             metadata.AddTail(id);
 
             // Act
@@ -424,7 +401,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         {
             // Arrange - Tests line 62: out-of-order deletion scenario
             // When an id is not in IdNodeMap but is between head and tail
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
@@ -445,7 +422,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_IdNotInMap_ReturnsEmptyAndFalse()
         {
             // Arrange - Tests lines 106-110: edge case where id is in range but not in IdNodeMap
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
             var idNotInMap = Guid.Parse("20000000-0000-0000-0000-000000000000");
@@ -464,7 +441,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_EmptyMetadata_WithNonNullId_ReturnsNull()
         {
             // Arrange - Tests line 58: when HeadId is null but id is not null
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
+            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var someId = Guid.NewGuid();
 
             // Act

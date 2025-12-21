@@ -40,7 +40,12 @@ namespace Baubit.Caching
         protected readonly IStore<TValue> l2Store;
         protected readonly IMetadata metadata;
         /// <summary>
-        /// A reader/writer lock guarding mutations and multi-field reads.
+        /// Tracks the ID of the last entry successfully added to the L1 store.
+        /// Used to maintain continuity when replenishing L1 from L2 without depending on store internals.
+        /// </summary>
+        protected Guid? lastAddedL1Id;
+        /// <summary>
+        /// A reader/writer lock guarding mutations and multi-field reads to ensure thread safety.
         /// </summary>
         protected readonly ReaderWriterLockSlim Locker = new ReaderWriterLockSlim();
         #endregion
@@ -127,11 +132,13 @@ namespace Baubit.Caching
             try
             {
                 if (disposedValue) { entry = default(IEntry<TValue>); return false; }
-                if (!metadata.GenerateNextId(out var nextId)) { entry = default(IEntry<TValue>); return false; }
-                if (!l2Store.Add(nextId, value, out entry)) return false;
+                if (!l2Store.Add(value, out entry)) return false;
                 if (l1Store?.HasCapacity == true)
                 {
-                    if (!l1Store.Add(entry)) return false;
+                    if (l1Store.Add(entry))
+                    {
+                        lastAddedL1Id = entry.Id;
+                    }
                 }
                 if (!metadata.AddTail(entry.Id)) return false;
                 if (!TryEvict()) return false;
@@ -140,6 +147,11 @@ namespace Baubit.Caching
             finally { Locker.ExitWriteLock(); }
         }
 
+        /// <summary>
+        /// Attempts to evict entries that have been read by all active enumerators.
+        /// Called periodically after a configured number of additions to maintain memory efficiency.
+        /// </summary>
+        /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
         private bool TryEvict()
         {
             if (Configuration != null && ++additionsSinceLastEviction >= Configuration.EvictAfterEveryX)
@@ -180,6 +192,13 @@ namespace Baubit.Caching
             finally { Locker.ExitReadLock(); }
         }
 
+        /// <summary>
+        /// Internal implementation of <see cref="GetEntryOrDefault"/> without locking.
+        /// Searches L1 first, then falls back to L2 if not found.
+        /// </summary>
+        /// <param name="id">The entry identifier.</param>
+        /// <param name="entry">On success, the located entry; otherwise <c>null</c>.</param>
+        /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
         private bool GetEntryOrDefaultInternal(Guid? id, out IEntry<TValue> entry)
         {
             entry = default(IEntry<TValue>);
@@ -209,6 +228,13 @@ namespace Baubit.Caching
             finally { Locker.ExitReadLock(); }
         }
 
+        /// <summary>
+        /// Internal implementation of <see cref="GetNextOrDefault"/> without locking.
+        /// Uses metadata to determine the next ID and then retrieves the corresponding entry.
+        /// </summary>
+        /// <param name="id">The current identifier.</param>
+        /// <param name="entry">On success, the next entry; otherwise <c>null</c>.</param>
+        /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
         private bool GetNextOrDefaultInternal(Guid? id, out IEntry<TValue> entry)
         {
             entry = default(IEntry<TValue>);
@@ -298,6 +324,12 @@ namespace Baubit.Caching
             finally { Locker.ExitReadLock(); }
         }
 
+        /// <summary>
+        /// Internal implementation of future entry retrieval without locking.
+        /// Waits for the next entry to be added after the current tail.
+        /// </summary>
+        /// <param name="cancellationToken">A token to cancel the wait.</param>
+        /// <returns>A task that completes with the next entry to be added.</returns>
         private Task<IEntry<TValue>> GetFutureFirstOrDefaultAsyncInternal(CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested) { Task.FromCanceled<IEntry<TValue>>(cancellationToken); }
@@ -322,6 +354,13 @@ namespace Baubit.Caching
             finally { Locker.ExitWriteLock(); }
         }
 
+        /// <summary>
+        /// Internal implementation of entry removal without external locking.
+        /// Removes from L2, L1 (if present), metadata, and triggers L1 replenishment.
+        /// </summary>
+        /// <param name="id">The identifier of the entry to remove.</param>
+        /// <param name="entry">On success, the removed entry.</param>
+        /// <returns><c>true</c> if the entry was removed; otherwise <c>false</c>.</returns>
         private bool RemoveInternal(Guid id, out IEntry<TValue> entry)
         {
             if (disposedValue) { entry = default(IEntry<TValue>); return false; }
@@ -345,9 +384,12 @@ namespace Baubit.Caching
         private bool ReplenishL1Store()
         {
             while (l1Store?.CurrentCapacity > 0 &&
-                   metadata.GetNextId(l1Store.TailId, out var nextId) &&
+                   metadata.GetNextId(lastAddedL1Id, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
-                   nextEntry != null && l1Store.Add(nextEntry)) ;
+                   nextEntry != null && l1Store.Add(nextEntry))
+            {
+                lastAddedL1Id = nextEntry.Id;
+            }
             return true;
         }
 
@@ -363,6 +405,11 @@ namespace Baubit.Caching
             finally { Locker.ExitWriteLock(); }
         }
 
+        /// <summary>
+        /// Internal implementation of cache clearing without external locking.
+        /// Removes all entries by iterating through metadata and calling RemoveInternal for each.
+        /// </summary>
+        /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
         private bool ClearInternal()
         {
             if (disposedValue) { return false; }
@@ -372,6 +419,7 @@ namespace Baubit.Caching
             {
                 RemoveInternal(id, out _);
             }
+            lastAddedL1Id = null; // Reset L1 tracking since cache is cleared
             return true;
         }
 
@@ -400,6 +448,11 @@ namespace Baubit.Caching
             }
         }
 
+        /// <summary>
+        /// Returns an asynchronous enumerator that iterates through the cache entries from the current head.
+        /// </summary>
+        /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
+        /// <returns>An asynchronous enumerator for the cache entries.</returns>
         public IAsyncEnumerator<IEntry<TValue>> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
             var retVal = new CacheAsyncEnumerator<TValue>(this, e => activeEnumerators.Remove(e), cancellationToken);
@@ -407,6 +460,12 @@ namespace Baubit.Caching
             return retVal;
         }
 
+        /// <summary>
+        /// Returns an asynchronous enumerator that iterates through future cache entries starting from the current tail.
+        /// This enumerator waits for new entries to be added to the cache.
+        /// </summary>
+        /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
+        /// <returns>An asynchronous enumerator for future cache entries.</returns>
         public IAsyncEnumerator<IEntry<TValue>> GetFutureAsyncEnumerator(CancellationToken cancellationToken = default)
         {
             var retVal = new CacheFutureAsyncEnumerator<TValue>(this, e => activeEnumerators.Remove(e), cancellationToken);

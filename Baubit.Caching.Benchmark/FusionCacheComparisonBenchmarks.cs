@@ -39,9 +39,10 @@ public class FusionCacheComparisonBenchmarks
             EvictAfterEveryX = int.MaxValue
         };
 
-        var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-        var l1Store = new InMemory.Store<string>(CacheSize / 10, CacheSize / 10, NullLoggerFactory.Instance);
-        var l2Store = new InMemory.Store<string>(NullLoggerFactory.Instance);
+        var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+        var metadata = new Metadata(config, NullLoggerFactory.Instance);
+        var l1Store = new InMemory.Store<string>(CacheSize / 10, CacheSize / 10, null, NullLoggerFactory.Instance);
+        var l2Store = new InMemory.Store<string>(identityGenerator, NullLoggerFactory.Instance);
 
         _baubitCache = new OrderedCache<string>(
             config,

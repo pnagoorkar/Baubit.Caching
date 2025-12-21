@@ -7,7 +7,7 @@ coverage:
         informational: false
 
 ignore:
-  - "Baubit.Caching.Tests/**"  # Exclude test project from coverage calculations
+  - "Baubit.Caching.Test/**"  # Exclude test project from coverage calculations
   - "**/*.Tests/**"              # Extra safety for any test patterns
   - "**/obj/**"                  # Ignore build artifacts
   - "**/bin/**"
