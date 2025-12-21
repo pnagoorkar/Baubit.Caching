@@ -34,9 +34,14 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         protected Configuration Configuration { get; private set; }
 
+        /// <summary>
+        /// Tracks the number of waiting room creations since the last reset, used for adaptive resizing.
+        /// </summary>
         private long roomCount;
 
-        // Coordinates awaiters for the next id produced.
+        /// <summary>
+        /// Coordinates awaiters for the next id produced.
+        /// </summary>
         private WaitingRoom<Guid> waitingRoom = new WaitingRoom<Guid>();
 
         private bool disposedValue;

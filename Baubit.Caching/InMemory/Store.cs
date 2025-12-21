@@ -14,6 +14,9 @@ namespace Baubit.Caching.InMemory
     {
         private readonly Dictionary<Guid, IEntry<TValue>> data = new Dictionary<Guid, IEntry<TValue>>();
         private readonly IIdentityGenerator identityGenerator;
+        /// <summary>
+        /// Tracks the most recently auto-generated ID to maintain monotonicity across Add operations.
+        /// </summary>
         private Guid? lastGeneratedId;
 
         private ILogger<Store<TValue>> logger;
@@ -44,6 +47,7 @@ namespace Baubit.Caching.InMemory
 
         }
 
+        /// <inheritdoc/>
         public override bool Add(IEntry<TValue> entry)
         {
             if (!HasCapacity) return false;
@@ -52,12 +56,14 @@ namespace Baubit.Caching.InMemory
             return true;
         }
 
+        /// <inheritdoc/>
         public override bool Add(Guid id, TValue value, out IEntry<TValue> entry)
         {
             entry = new Entry<TValue>(id, value);
             return Add(entry);
         }
 
+        /// <inheritdoc/>
         public override bool Add(TValue value, out IEntry<TValue> entry)
         {
             if (identityGenerator == null)
@@ -77,18 +83,21 @@ namespace Baubit.Caching.InMemory
             return Add(nextId, value, out entry);
         }
 
+        /// <inheritdoc/>
         public override bool GetCount(out long count)
         {
             count = data.Count;
             return true;
         }
 
+        /// <inheritdoc/>
         public override bool GetEntryOrDefault(Guid? id, out IEntry<TValue> entry)
         {
             entry = null;
             return id.HasValue && data.TryGetValue(id.Value, out entry);
         }
 
+        /// <inheritdoc/>
         public override bool GetValueOrDefault(Guid? id, out TValue value)
         {
             value = default(TValue);
@@ -97,6 +106,7 @@ namespace Baubit.Caching.InMemory
             return true;
         }
 
+        /// <inheritdoc/>
         public override bool Remove(Guid id, out IEntry<TValue> entry)
         {
             if (data.TryGetValue(id, out entry))
@@ -108,6 +118,7 @@ namespace Baubit.Caching.InMemory
             return false;
         }
 
+        /// <inheritdoc/>
         public override bool Update(IEntry<TValue> entry)
         {
             if (!data.ContainsKey(entry.Id)) return false;
@@ -115,6 +126,7 @@ namespace Baubit.Caching.InMemory
             return true;
         }
 
+        /// <inheritdoc/>
         public override bool Update(Guid id, TValue value)
         {
             // Optimize: avoid creating new Entry if we can update in-place
@@ -131,6 +143,7 @@ namespace Baubit.Caching.InMemory
             return Update(new Entry<TValue>(id, value));
         }
 
+        /// <inheritdoc/>
         protected override void DisposeInternal()
         {
             data.Clear();
