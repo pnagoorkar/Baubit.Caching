@@ -17,7 +17,7 @@ namespace Baubit.Caching.Test.OrderedCache
             long? l1MaxCap = null)
         {
             config ??= new Caching.Configuration();
-            var metadata = new Metadata { Configuration = config };
+            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
             var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
             var l1Store = l1MinCap.HasValue ? new Caching.InMemory.Store<string>(l1MinCap, l1MaxCap, _loggerFactory) : null;
 
@@ -1216,7 +1216,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 RunAdaptiveResizing = true,
                 AdaptionWindowMS = 100
             };
-            var metadata = new Metadata { Configuration = config };
+            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
             var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
             var l1Store = new Caching.InMemory.Store<string>(_loggerFactory); // Uncapped
 

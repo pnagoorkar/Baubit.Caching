@@ -7,11 +7,11 @@ namespace Baubit.Caching
 {
     public class WaitingRoom<TValue> : IDisposable
     {
-        public bool HasGuests { get => _numOfGuests > 0; }
+        public bool HasGuests { get => numOfGuests > 0; }
 
         private TaskCompletionSource<TValue> tcs = new TaskCompletionSource<TValue>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        private volatile int _numOfGuests = 0;
+        private volatile int numOfGuests = 0;
 
         private bool disposedValue;
 
@@ -20,14 +20,14 @@ namespace Baubit.Caching
             if (cancellationToken.IsCancellationRequested)
                 return await Task.FromCanceled<TValue>(cancellationToken);
 
-            Interlocked.Increment(ref _numOfGuests);
+            Interlocked.Increment(ref numOfGuests);
             try
             {
                 return await tcs.Task.WaitAsync(cancellationToken);
             }
             finally
             {
-                Interlocked.Decrement(ref _numOfGuests); // keep HasGuests accurate
+                Interlocked.Decrement(ref numOfGuests); // keep HasGuests accurate
             }
         }
 
