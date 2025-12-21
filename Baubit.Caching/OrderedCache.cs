@@ -40,6 +40,11 @@ namespace Baubit.Caching
         protected readonly IStore<TValue> l2Store;
         protected readonly IMetadata metadata;
         /// <summary>
+        /// Tracks the ID of the last entry successfully added to the L1 store.
+        /// Used for replenishing L1 from L2 without depending on store internals.
+        /// </summary>
+        protected Guid? lastAddedL1Id;
+        /// <summary>
         /// A reader/writer lock guarding mutations and multi-field reads.
         /// </summary>
         protected readonly ReaderWriterLockSlim Locker = new ReaderWriterLockSlim();
@@ -130,7 +135,10 @@ namespace Baubit.Caching
                 if (!l2Store.Add(value, out entry)) return false;
                 if (l1Store?.HasCapacity == true)
                 {
-                    if (!l1Store.Add(entry)) return false;
+                    if (l1Store.Add(entry))
+                    {
+                        lastAddedL1Id = entry.Id;
+                    }
                 }
                 if (!metadata.AddTail(entry.Id)) return false;
                 if (!TryEvict()) return false;
@@ -344,9 +352,12 @@ namespace Baubit.Caching
         private bool ReplenishL1Store()
         {
             while (l1Store?.CurrentCapacity > 0 &&
-                   metadata.GetNextId(l1Store.TailId, out var nextId) &&
+                   metadata.GetNextId(lastAddedL1Id, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
-                   nextEntry != null && l1Store.Add(nextEntry)) ;
+                   nextEntry != null && l1Store.Add(nextEntry))
+            {
+                lastAddedL1Id = nextEntry.Id;
+            }
             return true;
         }
 

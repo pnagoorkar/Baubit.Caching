@@ -21,10 +21,6 @@ namespace Baubit.Caching
         }
         public bool HasCapacity { get => Uncapped || CurrentCapacity > 0; }
 
-        public abstract Guid? HeadId { get; }
-
-        public abstract Guid? TailId { get; }
-
         private ILogger<Store<TValue>> logger;
         private bool disposedValue;
 

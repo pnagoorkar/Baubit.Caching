@@ -182,22 +182,6 @@ namespace Baubit.Caching.Test.InMemory.Store
         }
 
         [Fact]
-        public void Store_Add_WithValueOnly_UpdatesHeadAndTail()
-        {
-            // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
-
-            // Act
-            store.Add("first", out var entry1);
-            store.Add("second", out var entry2);
-            store.Add("third", out var entry3);
-
-            // Assert
-            Assert.Equal(entry1.Id, store.HeadId);
-            Assert.Equal(entry3.Id, store.TailId);
-        }
-
-        [Fact]
         public void Store_GetEntryOrDefault_ExistingId_ReturnsEntry()
         {
             // Arrange
@@ -357,64 +341,6 @@ namespace Baubit.Caching.Test.InMemory.Store
             // Assert
             Assert.True(result);
             Assert.Equal(2, count);
-        }
-
-        [Fact]
-        public void Store_HeadId_ReturnsMinimumGuid()
-        {
-            // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
-            var id3 = Guid.NewGuid();
-            var minId = new[] { id1, id2, id3 }.Min();
-
-            // Act
-            store.Add(id1, "first", out _);
-            store.Add(id2, "second", out _);
-            store.Add(id3, "third", out _);
-
-            // Assert
-            Assert.Equal(minId, store.HeadId);
-        }
-
-        [Fact]
-        public void Store_TailId_ReturnsMaximumGuid()
-        {
-            // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
-            var id1 = Guid.NewGuid();
-            var id2 = Guid.NewGuid();
-            var id3 = Guid.NewGuid();
-            var maxId = new[] { id1, id2, id3 }.Max();
-
-            // Act
-            store.Add(id1, "first", out _);
-            store.Add(id2, "second", out _);
-            store.Add(id3, "third", out _);
-
-            // Assert
-            Assert.Equal(maxId, store.TailId);
-        }
-
-        [Fact]
-        public void Store_HeadId_EmptyStore_ReturnsNull()
-        {
-            // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
-
-            // Act & Assert
-            Assert.Null(store.HeadId);
-        }
-
-        [Fact]
-        public void Store_TailId_EmptyStore_ReturnsNull()
-        {
-            // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
-
-            // Act & Assert
-            Assert.Null(store.TailId);
         }
 
         [Fact]

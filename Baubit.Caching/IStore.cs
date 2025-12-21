@@ -44,16 +44,6 @@ namespace Baubit.Caching
         long? TargetCapacity { get; }
 
         /// <summary>
-        /// The identifier of the first (head/oldest) entry present in this store, if available.
-        /// </summary>
-        Guid? HeadId { get; }
-
-        /// <summary>
-        /// The identifier of the last (tail/newest) entry present in this store, if available.
-        /// </summary>
-        Guid? TailId { get; }
-
-        /// <summary>
         /// Adds an existing entry instance to the store (e.g., promoting from another layer).
         /// </summary>
         /// <param name="entry">The entry instance to add.</param>
