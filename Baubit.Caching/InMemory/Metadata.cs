@@ -7,14 +7,27 @@ using System.Threading.Tasks;
 
 namespace Baubit.Caching.InMemory
 {
+    /// <summary>
+    /// In-memory implementation of <see cref="IMetadata"/> for tracking cache entry ordering and identifiers.
+    /// Thread-safe for concurrent access.
+    /// </summary>
     public class Metadata : IMetadata
     {
+        /// <summary>
+        /// Gets the linked list representing the current order of entry identifiers.
+        /// </summary>
         protected LinkedList<Guid> CurrentOrder { get; private set; } = new LinkedList<Guid>();
+        /// <summary>
+        /// Gets the mapping from entry identifiers to their linked list nodes.
+        /// </summary>
         protected Dictionary<Guid, LinkedListNode<Guid>> IdNodeMap { get; private set; } = new Dictionary<Guid, LinkedListNode<Guid>>();
 
+        /// <inheritdoc/>
         public long Count { get => IdNodeMap.Count; }
 
+        /// <inheritdoc/>
         public Guid? HeadId { get => CurrentOrder?.First?.Value; }
+        /// <inheritdoc/>
         public Guid? TailId { get => CurrentOrder?.Last?.Value; }
 
         /// <summary>
@@ -29,26 +42,41 @@ namespace Baubit.Caching.InMemory
 
         private IIdentityGenerator identityGenerator;
         private bool disposedValue;
+        private ILogger<Metadata> logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Metadata"/> class.
+        /// </summary>
+        /// <param name="configuration">The cache configuration.</param>
+        /// <param name="identityGenerator">The identity generator for producing new entry IDs.</param>
+        /// <param name="loggerFactory">The logger factory for diagnostics.</param>
         public Metadata(Configuration configuration, 
                         IIdentityGenerator identityGenerator, 
                         ILoggerFactory loggerFactory)
         {
+            logger = loggerFactory.CreateLogger<Metadata>();
             this.Configuration = configuration;
             this.identityGenerator = identityGenerator;
         }
 
+        /// <inheritdoc/>
         public long ResetRoomCount()
         {
             return Interlocked.Exchange(ref _roomCount, 0);
         }
 
+        /// <inheritdoc/>
         public bool AddTail(Guid id)
         {
             IdNodeMap.Add(id, CurrentOrder.AddLast(id));
             return SignalAwaiters(id);
         }
 
+        /// <summary>
+        /// Signals any awaiters waiting for the next ID.
+        /// </summary>
+        /// <param name="id">The new ID to signal.</param>
+        /// <returns><c>true</c> if signaled; otherwise <c>false</c>.</returns>
         private bool SignalAwaiters(Guid id)
         {
             if (!_waitingRoom.HasGuests) return true;
@@ -58,8 +86,10 @@ namespace Baubit.Caching.InMemory
             return prevRoom.TrySetResult(id);
         }
 
+        /// <inheritdoc/>
         public bool ContainsKey(Guid id) => IdNodeMap.ContainsKey(id);
 
+        /// <inheritdoc/>
         public bool GetNextId(Guid? id, out Guid? nextId)
         {
             if (id == null) nextId = HeadId;
@@ -76,6 +106,8 @@ namespace Baubit.Caching.InMemory
         /// Finds the smallest ID in the map that is greater than the given ID.
         /// This is an O(n) linear scan but avoids LINQ sorting allocations.
         /// </summary>
+        /// <param name="id">The ID to compare against.</param>
+        /// <returns>The next greater ID if found; otherwise <c>null</c>.</returns>
         private Guid? FindNextGreaterId(Guid id)
         {
             Guid? result = null;
@@ -92,6 +124,7 @@ namespace Baubit.Caching.InMemory
             return result;
         }
 
+        /// <inheritdoc/>
         public Task<Guid> GetNextIdAsync(Guid? id, CancellationToken cancellationToken)
         {
             if (!GetNextId(id, out var nextId))
@@ -105,6 +138,7 @@ namespace Baubit.Caching.InMemory
             return _waitingRoom.Join(cancellationToken);
         }
 
+        /// <inheritdoc/>
         public bool GenerateNextId(out Guid nextId)
         {
             if (TailId.HasValue)
@@ -115,6 +149,7 @@ namespace Baubit.Caching.InMemory
             return true;
         }
 
+        /// <inheritdoc/>
         public bool GetIdsThrough(Guid id, out IEnumerable<Guid> ids)
         {
             // (Empty store || if id preceeds the head) = do nothing
@@ -146,6 +181,9 @@ namespace Baubit.Caching.InMemory
         /// <summary>
         /// Enumerates nodes from start to endInclusive and returns a list to avoid iterator allocations.
         /// </summary>
+        /// <param name="start">The starting node.</param>
+        /// <param name="endInclusive">The ending node (inclusive).</param>
+        /// <returns>A list of GUIDs from start to endInclusive.</returns>
         private static List<Guid> EnumerateToList(LinkedListNode<Guid> start, LinkedListNode<Guid> endInclusive)
         {
             var result = new List<Guid>();
@@ -157,10 +195,21 @@ namespace Baubit.Caching.InMemory
             return result;
         }
 
+        /// <summary>
+        /// Determines if the given ID is smaller than the head ID.
+        /// </summary>
+        /// <param name="id">The ID to check.</param>
+        /// <returns><c>true</c> if smaller; otherwise <c>false</c>.</returns>
         private bool IsIdSmallerThanHeadId(Guid? id) => id.HasValue && HeadId.HasValue && id.Value.CompareTo(HeadId.Value) < 0;
 
+        /// <summary>
+        /// Determines if the given ID is the tail ID.
+        /// </summary>
+        /// <param name="id">The ID to check.</param>
+        /// <returns><c>true</c> if it is the tail; otherwise <c>false</c>.</returns>
         private bool IsIdTailId(Guid? id) => id.HasValue && TailId.HasValue && id == TailId;
 
+        /// <inheritdoc/>
         public bool Remove(Guid id)
         {
             if (IdNodeMap.TryGetValue(id, out var node))
@@ -172,6 +221,10 @@ namespace Baubit.Caching.InMemory
             return false;
         }
 
+        /// <summary>
+        /// Releases the resources used by the <see cref="Metadata"/> class.
+        /// </summary>
+        /// <param name="disposing">Whether called from Dispose().</param>
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)
@@ -188,6 +241,7 @@ namespace Baubit.Caching.InMemory
             }
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
