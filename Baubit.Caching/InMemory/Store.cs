@@ -7,21 +7,21 @@ namespace Baubit.Caching.InMemory
     public class Store<TValue> : Caching.Store<TValue>
     {
         // Cache the head and tail IDs to avoid O(n) Min/Max operations
-        private Guid? _headId;
-        private Guid? _tailId;
+        private Guid? headId;
+        private Guid? tailId;
 
-        public override Guid? HeadId { get => _headId; }
-        public override Guid? TailId { get => _tailId; }
+        public override Guid? HeadId { get => headId; }
+        public override Guid? TailId { get => tailId; }
 
-        private readonly Dictionary<Guid, IEntry<TValue>> _data = new Dictionary<Guid, IEntry<TValue>>();
+        private readonly Dictionary<Guid, IEntry<TValue>> data = new Dictionary<Guid, IEntry<TValue>>();
 
-        private ILogger<Store<TValue>> _logger;
+        private ILogger<Store<TValue>> logger;
 
         public Store(long? minCap,
                      long? maxCap,
                      ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
         {
-            _logger = loggerFactory.CreateLogger<Store<TValue>>();
+            logger = loggerFactory.CreateLogger<Store<TValue>>();
         }
 
         public Store(ILoggerFactory loggerFactory) : this(null, null, loggerFactory)
@@ -32,8 +32,8 @@ namespace Baubit.Caching.InMemory
         public override bool Add(IEntry<TValue> entry)
         {
             if (!HasCapacity) return false;
-            if (_data.ContainsKey(entry.Id)) return false;
-            _data[entry.Id] = entry;
+            if (data.ContainsKey(entry.Id)) return false;
+            data[entry.Id] = entry;
             UpdateHeadTailOnAdd(entry.Id);
             return true;
         }
@@ -48,40 +48,40 @@ namespace Baubit.Caching.InMemory
         {
             // GuidV7 IDs are time-ordered, so new entries are always the tail
             // Head is the smallest, tail is the largest
-            if (!_headId.HasValue || id.CompareTo(_headId.Value) < 0)
+            if (!headId.HasValue || id.CompareTo(headId.Value) < 0)
             {
-                _headId = id;
+                headId = id;
             }
-            if (!_tailId.HasValue || id.CompareTo(_tailId.Value) > 0)
+            if (!tailId.HasValue || id.CompareTo(tailId.Value) > 0)
             {
-                _tailId = id;
+                tailId = id;
             }
         }
 
         private void UpdateHeadTailOnRemove(Guid id)
         {
-            if (_data.Count == 0)
+            if (data.Count == 0)
             {
-                _headId = null;
-                _tailId = null;
+                headId = null;
+                tailId = null;
                 return;
             }
 
             // Only recalculate if we removed the head or tail
-            if (_headId.HasValue && id.CompareTo(_headId.Value) == 0)
+            if (headId.HasValue && id.CompareTo(headId.Value) == 0)
             {
-                _headId = FindMin();
+                headId = FindMin();
             }
-            if (_tailId.HasValue && id.CompareTo(_tailId.Value) == 0)
+            if (tailId.HasValue && id.CompareTo(tailId.Value) == 0)
             {
-                _tailId = FindMax();
+                tailId = FindMax();
             }
         }
 
         private Guid? FindMin()
         {
             Guid? min = null;
-            foreach (var key in _data.Keys)
+            foreach (var key in data.Keys)
             {
                 if (!min.HasValue || key.CompareTo(min.Value) < 0)
                 {
@@ -94,7 +94,7 @@ namespace Baubit.Caching.InMemory
         private Guid? FindMax()
         {
             Guid? max = null;
-            foreach (var key in _data.Keys)
+            foreach (var key in data.Keys)
             {
                 if (!max.HasValue || key.CompareTo(max.Value) > 0)
                 {
@@ -106,14 +106,14 @@ namespace Baubit.Caching.InMemory
 
         public override bool GetCount(out long count)
         {
-            count = _data.Count;
+            count = data.Count;
             return true;
         }
 
         public override bool GetEntryOrDefault(Guid? id, out IEntry<TValue> entry)
         {
             entry = null;
-            return id.HasValue && _data.TryGetValue(id.Value, out entry);
+            return id.HasValue && data.TryGetValue(id.Value, out entry);
         }
 
         public override bool GetValueOrDefault(Guid? id, out TValue value)
@@ -126,9 +126,9 @@ namespace Baubit.Caching.InMemory
 
         public override bool Remove(Guid id, out IEntry<TValue> entry)
         {
-            if (_data.TryGetValue(id, out entry))
+            if (data.TryGetValue(id, out entry))
             {
-                _data.Remove(id);
+                data.Remove(id);
                 UpdateHeadTailOnRemove(id);
                 return true;
             }
@@ -138,15 +138,15 @@ namespace Baubit.Caching.InMemory
 
         public override bool Update(IEntry<TValue> entry)
         {
-            if (!_data.ContainsKey(entry.Id)) return false;
-            _data[entry.Id] = entry;
+            if (!data.ContainsKey(entry.Id)) return false;
+            data[entry.Id] = entry;
             return true;
         }
 
         public override bool Update(Guid id, TValue value)
         {
             // Optimize: avoid creating new Entry if we can update in-place
-            if (_data.TryGetValue(id, out var existingEntry))
+            if (data.TryGetValue(id, out var existingEntry))
             {
                 // Entry<TValue>.Value is an auto-property with setter, allowing in-place modification
                 if (existingEntry is Entry<TValue> typedEntry)
@@ -161,9 +161,9 @@ namespace Baubit.Caching.InMemory
 
         protected override void DisposeInternal()
         {
-            _data.Clear();
-            _headId = null;
-            _tailId = null;
+            data.Clear();
+            headId = null;
+            tailId = null;
         }
     }
 }

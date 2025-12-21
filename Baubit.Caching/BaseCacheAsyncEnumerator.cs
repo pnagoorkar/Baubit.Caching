@@ -20,9 +20,9 @@ namespace Baubit.Caching
         /// </summary>
         public Guid? CurrentId => Current?.Id;
 
-        protected readonly IOrderedCache<TValue> _cache;
-        private Action<ICacheEnumerator> _onDispose;
-        private CancellationToken _cancellationToken;
+        protected readonly IOrderedCache<TValue> cache;
+        private Action<ICacheEnumerator> onDispose;
+        private CancellationToken cancellationToken;
         private CancellationTokenRegistration cancellationTokenRegistration;
         /// <summary>
         /// Initializes a new instance of the <see cref="BaseCacheAsyncEnumerator{TValue}"/> class.
@@ -34,10 +34,10 @@ namespace Baubit.Caching
                                     Action<ICacheEnumerator> onDispose,
                                     CancellationToken cancellationToken = default)
         {
-            _cache = cache;
-            _onDispose = onDispose;
-            _cancellationToken = cancellationToken;
-            cancellationTokenRegistration = _cancellationToken.Register(() => DisposeAsync());
+            this.cache = cache;
+            this.onDispose = onDispose;
+            this.cancellationToken = cancellationToken;
+            cancellationTokenRegistration = this.cancellationToken.Register(() => DisposeAsync());
         }
         /// <summary>
         /// Disposes the enumerator asynchronously.
@@ -45,7 +45,7 @@ namespace Baubit.Caching
         /// <returns>A value task representing the asynchronous dispose operation.</returns>
         public virtual ValueTask DisposeAsync()
         {
-            _onDispose?.Invoke(this);
+            onDispose?.Invoke(this);
             cancellationTokenRegistration.Dispose();
             return default(ValueTask);
         }
@@ -55,17 +55,17 @@ namespace Baubit.Caching
         /// <returns><c>true</c> if the enumerator was advanced; otherwise <c>false</c>.</returns>
         public virtual async ValueTask<bool> MoveNextAsync()
         {
-            if (_cancellationToken.IsCancellationRequested) return false;
+            if (cancellationToken.IsCancellationRequested) return false;
             try
             {
-                Current = await _cache.GetNextAsync(CurrentId, _cancellationToken).ConfigureAwait(false);
+                Current = await cache.GetNextAsync(CurrentId, cancellationToken).ConfigureAwait(false);
             }
             catch (TaskCanceledException)
             {
-                // expected when _cancellationToken is cancelled
+                // expected when cancellationToken is cancelled
                 return false;
             }
-            return !_cancellationToken.IsCancellationRequested;
+            return !cancellationToken.IsCancellationRequested;
         }
     }
 }
