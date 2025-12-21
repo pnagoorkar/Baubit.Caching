@@ -40,7 +40,7 @@ namespace Baubit.Caching.InMemory
         // Coordinates awaiters for the next id produced.
         private WaitingRoom<Guid> waitingRoom = new WaitingRoom<Guid>();
 
-        private IIdentityGenerator identityGenerator;
+        protected readonly IIdentityGenerator identityGenerator;
         private bool disposedValue;
         private ILogger<Metadata> logger;
 
