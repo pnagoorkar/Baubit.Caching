@@ -25,7 +25,7 @@ namespace Baubit.Caching
 
         public abstract Guid? TailId { get; }
 
-        private ILogger<Store<TValue>> _logger;
+        private ILogger<Store<TValue>> logger;
         private bool disposedValue;
 
         public Store(long? minCap,
@@ -34,7 +34,7 @@ namespace Baubit.Caching
         {
             TargetCapacity = MinCapacity = minCap;
             MaxCapacity = maxCap;
-            _logger = loggerFactory.CreateLogger<Store<TValue>>();
+            logger = loggerFactory.CreateLogger<Store<TValue>>();
         }
 
         public abstract bool Add(IEntry<TValue> entry);

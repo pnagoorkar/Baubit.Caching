@@ -35,10 +35,10 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         protected Configuration Configuration { get; private set; }
 
-        private long _roomCount;
+        private long roomCount;
 
         // Coordinates awaiters for the next id produced.
-        private WaitingRoom<Guid> _waitingRoom = new WaitingRoom<Guid>();
+        private WaitingRoom<Guid> waitingRoom = new WaitingRoom<Guid>();
 
         private IIdentityGenerator identityGenerator;
         private bool disposedValue;
@@ -62,7 +62,7 @@ namespace Baubit.Caching.InMemory
         /// <inheritdoc/>
         public long ResetRoomCount()
         {
-            return Interlocked.Exchange(ref _roomCount, 0);
+            return Interlocked.Exchange(ref roomCount, 0);
         }
 
         /// <inheritdoc/>
@@ -79,10 +79,10 @@ namespace Baubit.Caching.InMemory
         /// <returns><c>true</c> if signaled; otherwise <c>false</c>.</returns>
         private bool SignalAwaiters(Guid id)
         {
-            if (!_waitingRoom.HasGuests) return true;
-            if (Configuration?.RunAdaptiveResizing == true) Interlocked.Increment(ref _roomCount);
-            var prevRoom = _waitingRoom;
-            _waitingRoom = new WaitingRoom<Guid>();
+            if (!waitingRoom.HasGuests) return true;
+            if (Configuration?.RunAdaptiveResizing == true) Interlocked.Increment(ref roomCount);
+            var prevRoom = waitingRoom;
+            waitingRoom = new WaitingRoom<Guid>();
             return prevRoom.TrySetResult(id);
         }
 
@@ -135,7 +135,7 @@ namespace Baubit.Caching.InMemory
             {
                 return Task.FromResult(nextId.Value);
             }
-            return _waitingRoom.Join(cancellationToken);
+            return waitingRoom.Join(cancellationToken);
         }
 
         /// <inheritdoc/>
