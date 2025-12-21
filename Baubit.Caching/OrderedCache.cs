@@ -19,29 +19,30 @@ namespace Baubit.Caching
         /// <summary>
         /// Gets the runtime configuration for this cache instance.
         /// </summary>
-        public Configuration Configuration { get; set; }
+        public Configuration Configuration { get; private set; }
 
         /// <inheritdoc/>
         public long Count { get => _metadata.Count; }
 
-        /// <summary>
-        /// A reader/writer lock guarding mutations and multi-field reads.
-        /// </summary>
-        protected readonly ReaderWriterLockSlim Locker = new ReaderWriterLockSlim();
-
         #region PrivateMembers
         private bool disposedValue;
-
-        private IMetadata _metadata;
 
         private Task<bool> adaptionRunner;
         private CancellationTokenSource adaptionCTS;
         private readonly ILogger<OrderedCache<TValue>> _logger;
 
-        private IStore<TValue> _l1Store;
-        private IStore<TValue> _l2Store;
         private readonly IList<ICacheEnumerator> _activeEnumerators = new ConcurrentList<ICacheEnumerator>();
         private int additionsSinceLastEviction = 0;
+        #endregion
+
+        #region ProtectedMembers
+        protected readonly IStore<TValue> _l1Store;
+        protected readonly IStore<TValue> _l2Store;
+        protected readonly IMetadata _metadata;
+        /// <summary>
+        /// A reader/writer lock guarding mutations and multi-field reads.
+        /// </summary>
+        protected readonly ReaderWriterLockSlim Locker = new ReaderWriterLockSlim();
         #endregion
 
         /// <summary>
