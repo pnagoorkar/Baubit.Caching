@@ -5,6 +5,11 @@ using System.Collections.Generic;
 
 namespace Baubit.Caching.InMemory
 {
+    /// <summary>
+    /// In-memory implementation of <see cref="IStore{TValue}"/> using a dictionary for storage.
+    /// Thread-safe for concurrent readers/writers when used with external synchronization.
+    /// </summary>
+    /// <typeparam name="TValue">The type of values stored in this store.</typeparam>
     public class Store<TValue> : Caching.Store<TValue>
     {
         private readonly Dictionary<Guid, IEntry<TValue>> data = new Dictionary<Guid, IEntry<TValue>>();
@@ -13,6 +18,13 @@ namespace Baubit.Caching.InMemory
 
         private ILogger<Store<TValue>> logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Store{TValue}"/> class with capacity bounds.
+        /// </summary>
+        /// <param name="minCap">Minimum capacity for the store.</param>
+        /// <param name="maxCap">Maximum capacity for the store.</param>
+        /// <param name="identityGenerator">Optional identity generator for auto-generating entry IDs.</param>
+        /// <param name="loggerFactory">Factory for creating loggers.</param>
         public Store(long? minCap,
                      long? maxCap,
                      IIdentityGenerator identityGenerator,
@@ -22,6 +34,11 @@ namespace Baubit.Caching.InMemory
             logger = loggerFactory.CreateLogger<Store<TValue>>();
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Store{TValue}"/> class without capacity bounds (uncapped).
+        /// </summary>
+        /// <param name="identityGenerator">Optional identity generator for auto-generating entry IDs.</param>
+        /// <param name="loggerFactory">Factory for creating loggers.</param>
         public Store(IIdentityGenerator identityGenerator, ILoggerFactory loggerFactory) : this(null, null, identityGenerator, loggerFactory)
         {
 
