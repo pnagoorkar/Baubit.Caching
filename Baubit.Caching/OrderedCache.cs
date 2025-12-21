@@ -382,6 +382,7 @@ namespace Baubit.Caching
             {
                 RemoveInternal(id, out _);
             }
+            lastAddedL1Id = null; // Reset L1 tracking since cache is cleared
             return true;
         }
 
