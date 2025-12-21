@@ -1,4 +1,5 @@
 ﻿using Baubit.Identity;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -8,8 +9,8 @@ namespace Baubit.Caching.InMemory
 {
     public class Metadata : IMetadata
     {
-        public LinkedList<Guid> CurrentOrder { get; set; } = new LinkedList<Guid>();
-        public Dictionary<Guid, LinkedListNode<Guid>> IdNodeMap { get; set; } = new Dictionary<Guid, LinkedListNode<Guid>>();
+        protected LinkedList<Guid> CurrentOrder { get; private set; } = new LinkedList<Guid>();
+        protected Dictionary<Guid, LinkedListNode<Guid>> IdNodeMap { get; private set; } = new Dictionary<Guid, LinkedListNode<Guid>>();
 
         public long Count { get => IdNodeMap.Count; }
 
@@ -19,15 +20,23 @@ namespace Baubit.Caching.InMemory
         /// <summary>
         /// Gets the runtime configuration for this cache instance.
         /// </summary>
-        public Configuration Configuration { get; set; }
+        protected Configuration Configuration { get; private set; }
 
         private long _roomCount;
 
         // Coordinates awaiters for the next id produced.
         private WaitingRoom<Guid> _waitingRoom = new WaitingRoom<Guid>();
 
-        private GuidV7Generator idGenerator = GuidV7Generator.CreateNew();
+        private IIdentityGenerator identityGenerator;
         private bool disposedValue;
+
+        public Metadata(Configuration configuration, 
+                        IIdentityGenerator identityGenerator, 
+                        ILoggerFactory loggerFactory)
+        {
+            this.Configuration = configuration;
+            this.identityGenerator = identityGenerator;
+        }
 
         public long ResetRoomCount()
         {
@@ -100,9 +109,9 @@ namespace Baubit.Caching.InMemory
         {
             if (TailId.HasValue)
             {
-                idGenerator.InitializeFrom(TailId.Value);
+                identityGenerator.InitializeFrom(TailId.Value);
             }
-            nextId = idGenerator.GetNext();
+            nextId = identityGenerator.GetNext();
             return true;
         }
 

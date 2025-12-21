@@ -32,7 +32,7 @@ public class OrderedCacheBenchmarks
             EvictAfterEveryX = int.MaxValue
         };
 
-        var metadata = new Metadata { Configuration = config };
+        var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
         var l1Store = new InMemory.Store<string>(CacheSize / 10, CacheSize / 10, NullLoggerFactory.Instance);
         var l2Store = new InMemory.Store<string>(NullLoggerFactory.Instance);
 

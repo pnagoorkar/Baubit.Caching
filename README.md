@@ -282,7 +282,7 @@ using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging;
 
 var config = new Configuration { EvictAfterEveryX = 100 };
-var metadata = new Metadata { Configuration = config };
+var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), loggerFactory);
 var l1Store = new Store<string>(100, 1000, loggerFactory); // Min: 100, Max: 1000
 var l2Store = new Store<string>(loggerFactory);            // Unbounded
 
