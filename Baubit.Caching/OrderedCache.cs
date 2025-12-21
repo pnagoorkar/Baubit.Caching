@@ -135,8 +135,10 @@ namespace Baubit.Caching
                 if (!l2Store.Add(value, out entry)) return false;
                 if (l1Store?.HasCapacity == true)
                 {
-                    if (!l1Store.Add(entry)) return false;
-                    lastAddedL1Id = entry.Id;
+                    if (l1Store.Add(entry))
+                    {
+                        lastAddedL1Id = entry.Id;
+                    }
                 }
                 if (!metadata.AddTail(entry.Id)) return false;
                 if (!TryEvict()) return false;
