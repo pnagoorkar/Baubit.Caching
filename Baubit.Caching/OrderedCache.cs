@@ -127,8 +127,7 @@ namespace Baubit.Caching
             try
             {
                 if (disposedValue) { entry = default(IEntry<TValue>); return false; }
-                if (!metadata.GenerateNextId(out var nextId)) { entry = default(IEntry<TValue>); return false; }
-                if (!l2Store.Add(nextId, value, out entry)) return false;
+                if (!l2Store.Add(value, out entry)) return false;
                 if (l1Store?.HasCapacity == true)
                 {
                     if (!l1Store.Add(entry)) return false;

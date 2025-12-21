@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Baubit.Identity;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 
@@ -14,17 +15,20 @@ namespace Baubit.Caching.InMemory
         public override Guid? TailId { get => tailId; }
 
         private readonly Dictionary<Guid, IEntry<TValue>> data = new Dictionary<Guid, IEntry<TValue>>();
+        private readonly IIdentityGenerator identityGenerator;
 
         private ILogger<Store<TValue>> logger;
 
         public Store(long? minCap,
                      long? maxCap,
+                     IIdentityGenerator identityGenerator,
                      ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
         {
+            this.identityGenerator = identityGenerator;
             logger = loggerFactory.CreateLogger<Store<TValue>>();
         }
 
-        public Store(ILoggerFactory loggerFactory) : this(null, null, loggerFactory)
+        public Store(IIdentityGenerator identityGenerator, ILoggerFactory loggerFactory) : this(null, null, identityGenerator, loggerFactory)
         {
 
         }
@@ -42,6 +46,24 @@ namespace Baubit.Caching.InMemory
         {
             entry = new Entry<TValue>(id, value);
             return Add(entry);
+        }
+
+        public override bool Add(TValue value, out IEntry<TValue> entry)
+        {
+            if (identityGenerator == null)
+            {
+                entry = default(IEntry<TValue>);
+                return false;
+            }
+
+            // Initialize from tail if available to ensure monotonicity
+            if (tailId.HasValue)
+            {
+                identityGenerator.InitializeFrom(tailId.Value);
+            }
+
+            var nextId = identityGenerator.GetNext();
+            return Add(nextId, value, out entry);
         }
 
         private void UpdateHeadTailOnAdd(Guid id)

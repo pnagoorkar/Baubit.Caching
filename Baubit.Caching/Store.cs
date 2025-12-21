@@ -41,6 +41,8 @@ namespace Baubit.Caching
 
         public abstract bool Add(Guid id, TValue value, out IEntry<TValue> entry);
 
+        public abstract bool Add(TValue value, out IEntry<TValue> entry);
+
         public bool AddCapacity(int additionalCapacity)
         {
             if (Uncapped) return true;

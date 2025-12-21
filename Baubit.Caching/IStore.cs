@@ -70,6 +70,14 @@ namespace Baubit.Caching
         bool Add(Guid id, TValue value, out IEntry<TValue> entry);
 
         /// <summary>
+        /// Adds a new value to the store, with the store auto-generating the next identifier.
+        /// </summary>
+        /// <param name="value">The value to add.</param>
+        /// <param name="entry">When the method returns <c>true</c>, contains the created entry with auto-generated ID.</param>
+        /// <returns><c>true</c> if the value was added; otherwise <c>false</c>.</returns>
+        bool Add(TValue value, out IEntry<TValue> entry);
+
+        /// <summary>
         /// Increases the store capacity by the specified amount (implementation-defined semantics).
         /// </summary>
         /// <param name="additionalCapacity">The amount by which to grow capacity.</param>
