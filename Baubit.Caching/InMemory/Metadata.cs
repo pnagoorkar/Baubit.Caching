@@ -1,5 +1,4 @@
-﻿using Baubit.Identity;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -35,12 +34,16 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         protected Configuration Configuration { get; private set; }
 
+        /// <summary>
+        /// Tracks the number of waiting room creations since the last reset, used for adaptive resizing.
+        /// </summary>
         private long roomCount;
 
-        // Coordinates awaiters for the next id produced.
+        /// <summary>
+        /// Coordinates awaiters for the next id produced.
+        /// </summary>
         private WaitingRoom<Guid> waitingRoom = new WaitingRoom<Guid>();
 
-        protected readonly IIdentityGenerator identityGenerator;
         private bool disposedValue;
         private ILogger<Metadata> logger;
 
@@ -48,15 +51,12 @@ namespace Baubit.Caching.InMemory
         /// Initializes a new instance of the <see cref="Metadata"/> class.
         /// </summary>
         /// <param name="configuration">The cache configuration.</param>
-        /// <param name="identityGenerator">The identity generator for producing new entry IDs.</param>
         /// <param name="loggerFactory">The logger factory for diagnostics.</param>
         public Metadata(Configuration configuration, 
-                        IIdentityGenerator identityGenerator, 
                         ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<Metadata>();
             this.Configuration = configuration;
-            this.identityGenerator = identityGenerator;
         }
 
         /// <inheritdoc/>
@@ -136,17 +136,6 @@ namespace Baubit.Caching.InMemory
                 return Task.FromResult(nextId.Value);
             }
             return waitingRoom.Join(cancellationToken);
-        }
-
-        /// <inheritdoc/>
-        public bool GenerateNextId(out Guid nextId)
-        {
-            if (TailId.HasValue)
-            {
-                identityGenerator.InitializeFrom(TailId.Value);
-            }
-            nextId = identityGenerator.GetNext();
-            return true;
         }
 
         /// <inheritdoc/>

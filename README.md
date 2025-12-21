@@ -219,12 +219,12 @@ This ensures iteration continues even when entries are removed out-of-order.
 ```
 
 - **L1 Store**: Optional bounded in-memory cache (hot entries, configurable min/max capacity)
-- **L2 Store**: Required **unbounded** backing store (holds all entries)
+- **L2 Store**: Required **unbounded** backing store (holds all entries, generates GuidV7 IDs)
 - **Metadata**: Ordered doubly-linked list of GuidV7 IDs with O(1) head/tail access
 - **Concurrency**: `ReaderWriterLockSlim` for concurrent access (multiple readers, single writer)
 
 **Flow:**
-1. `Add` inserts to L2, then replenishes L1 if space available
+1. `Add` generates ID in L2, inserts to L2, then replenishes L1 if space available
 2. `GetEntryOrDefault` checks L1 first, falls back to L2 on miss
 3. Eviction removes entries from both L1 and L2 based on slowest enumerator position
 
@@ -283,9 +283,10 @@ using Microsoft.Extensions.Logging;
 
 var config = new Configuration { EvictAfterEveryX = 100 };
 using var loggerFactory = LoggerFactory.Create(builder => { });
-var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), loggerFactory);
-var l1Store = new Store<string>(100, 1000, loggerFactory); // Min: 100, Max: 1000
-var l2Store = new Store<string>(loggerFactory);            // Unbounded
+var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+var metadata = new Metadata(config, loggerFactory);
+var l1Store = new Store<string>(100, 1000, null, loggerFactory); // Min: 100, Max: 1000
+var l2Store = new Store<string>(identityGenerator, loggerFactory); // Unbounded, generates IDs
 
 using var cache = new OrderedCache<string>(
     config, l1Store, l2Store, metadata, loggerFactory

@@ -44,16 +44,6 @@ namespace Baubit.Caching
         long? TargetCapacity { get; }
 
         /// <summary>
-        /// The identifier of the first (head/oldest) entry present in this store, if available.
-        /// </summary>
-        Guid? HeadId { get; }
-
-        /// <summary>
-        /// The identifier of the last (tail/newest) entry present in this store, if available.
-        /// </summary>
-        Guid? TailId { get; }
-
-        /// <summary>
         /// Adds an existing entry instance to the store (e.g., promoting from another layer).
         /// </summary>
         /// <param name="entry">The entry instance to add.</param>
@@ -68,6 +58,14 @@ namespace Baubit.Caching
         /// <param name="entry">When the method returns <c>true</c>, contains the created entry.</param>
         /// <returns><c>true</c> if the value was added; otherwise <c>false</c>.</returns>
         bool Add(Guid id, TValue value, out IEntry<TValue> entry);
+
+        /// <summary>
+        /// Adds a new value to the store, with the store auto-generating the next identifier.
+        /// </summary>
+        /// <param name="value">The value to add.</param>
+        /// <param name="entry">When the method returns <c>true</c>, contains the created entry with auto-generated ID.</param>
+        /// <returns><c>true</c> if the value was added; otherwise <c>false</c>.</returns>
+        bool Add(TValue value, out IEntry<TValue> entry);
 
         /// <summary>
         /// Increases the store capacity by the specified amount (implementation-defined semantics).

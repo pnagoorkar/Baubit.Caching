@@ -47,12 +47,6 @@ namespace Baubit.Caching
         /// <returns><c>true</c> if the lookup succeeded; otherwise <c>false</c>.</returns>
         bool GetNextId(Guid? id, out Guid? nextId);
         /// <summary>
-        /// Generates the next unique identifier for a new entry.
-        /// </summary>
-        /// <param name="nextId">On success, the generated identifier.</param>
-        /// <returns><c>true</c> if the identifier was generated; otherwise <c>false</c>.</returns>
-        bool GenerateNextId(out Guid nextId);
-        /// <summary>
         /// Asynchronously gets the next identifier after the specified one.
         /// </summary>
         /// <param name="id">The current identifier.</param>
