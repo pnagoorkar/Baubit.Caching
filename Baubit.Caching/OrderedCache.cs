@@ -157,11 +157,21 @@ namespace Baubit.Caching
             if (Configuration != null && ++additionsSinceLastEviction >= Configuration.EvictAfterEveryX)
             {
                 var lowestId = activeEnumerators.Min(e => e.CurrentId);
-                if (lowestId == null) return true; // there is at least 1 enumerator that hasnt read even the head. respect the reader and short circuit
-                metadata.GetIdsThrough(lowestId.Value, out var ids);
-                foreach (var id in ids)
+                // If lowestId is null, check if there are active enumerators
+                if (lowestId == null)
                 {
-                    RemoveInternal(id, out _);
+                    // If there are active enumerators, at least one hasn't read the head yet - respect the reader
+                    if (activeEnumerators.Count > 0) return true;
+                    // If there are no active enumerators, evict all entries up to the tail
+                    lowestId = metadata.TailId;
+                }
+                if (lowestId != null)
+                {
+                    metadata.GetIdsThrough(lowestId.Value, out var ids);
+                    foreach (var id in ids)
+                    {
+                        RemoveInternal(id, out _);
+                    }
                 }
                 additionsSinceLastEviction = 0;
             }
