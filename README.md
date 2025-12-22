@@ -431,8 +431,31 @@ Entries are evicted based on active enumerator positions:
 var config = new Configuration { EvictAfterEveryX = 100 };
 ```
 
-- Every 100 `Add` operations, evicts entries **before** the slowest active enumerator
+**Behavior:**
+- Every `EvictAfterEveryX` `Add` operations triggers eviction logic
+- **With active enumerators**: Evicts entries **before** the slowest active enumerator's current position
+- **Without active enumerators**: Evicts **all entries** up to and including the tail
 - Prevents unbounded memory growth when consumers lag behind producers
+- Enumerators that are not properly disposed will pin memory indefinitely
+
+**Important**: Always dispose enumerators when done (use `using` statements or cancel `CancellationToken`) to allow eviction to proceed. Abandoned enumerators prevent memory cleanup.
+
+**Example - Multiple Consumer Speeds:**
+```csharp
+// Fast consumer at entry 100, slow consumer at entry 10
+// Eviction will only remove entries before entry 10
+// This ensures all active consumers can still read their data
+```
+
+**Example - No Active Consumers:**
+```csharp
+// Cache with no active enumerators
+cache.Add("item-1", out _);
+// ... add 99 more items ...
+cache.Add("item-100", out _); // Triggers eviction at threshold
+// All 100 entries evicted since no consumers are reading
+Assert.Equal(0, cache.Count);
+```
 
 **Configuration Options:**
 ```csharp
@@ -513,9 +536,11 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 ### Q: Can slow enumerators cause memory leaks?
 
 **A:** Yes. Enumerators that are not disposed will pin memory indefinitely, preventing eviction of entries they haven't processed. Always:
-- Use `using` with enumerators
+- Use `using` with enumerators or ensure `DisposeAsync()` is called
 - Cancel `CancellationToken` when consumers shut down
 - Set appropriate `EvictAfterEveryX` to limit growth
+
+**Note**: With no active enumerators, the cache automatically evicts all entries at the eviction threshold. This means if you're using the cache without enumerators (e.g., only `Add`/`Get`/`Remove` operations), entries will be cleared periodically unless you disable eviction by setting `EvictAfterEveryX` to a very high value (e.g., `int.MaxValue`).
 
 ### Q: Is it safe to remove entries during iteration?
 

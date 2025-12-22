@@ -30,6 +30,7 @@ namespace Baubit.Caching
         private Task<bool> adaptionRunner;
         private CancellationTokenSource adaptionCTS;
         private readonly ILogger<OrderedCache<TValue>> logger;
+        private readonly ICacheAsyncEnumeratorFactory<TValue> enumeratorFactory;
 
         private readonly IList<ICacheEnumerator> activeEnumerators = new ConcurrentList<ICacheEnumerator>();
         private int additionsSinceLastEviction = 0;
@@ -58,17 +59,20 @@ namespace Baubit.Caching
         /// <param name="l2Store">Backing L2 store that must persist every entry.</param>
         /// <param name="metadata">Metadata that tracks head/tail ids and next-id lookups.</param>
         /// <param name="loggerFactory">Factory to create a logger for diagnostics and tracing.</param>
+        /// <param name="enumeratorFactory">Optional factory for creating enumerators. If null, uses default factory.</param>
         public OrderedCache(Configuration cacheConfiguration,
                             IStore<TValue> l1Store,
                             IStore<TValue> l2Store,
                             IMetadata metadata,
-                            ILoggerFactory loggerFactory)
+                            ILoggerFactory loggerFactory,
+                            ICacheAsyncEnumeratorFactory<TValue> enumeratorFactory = null)
         {
             logger = loggerFactory.CreateLogger<OrderedCache<TValue>>();
             Configuration = cacheConfiguration;
             this.l1Store = l1Store;
             this.l2Store = l2Store;
             this.metadata = metadata;
+            this.enumeratorFactory = enumeratorFactory ?? new CacheAsyncEnumeratorFactory<TValue>();
             if (this.l1Store != null && !this.l1Store.Uncapped && Configuration?.RunAdaptiveResizing == true)
             {
                 // Start a background loop that adjusts L1 capacity based on production rate.
@@ -157,11 +161,21 @@ namespace Baubit.Caching
             if (Configuration != null && ++additionsSinceLastEviction >= Configuration.EvictAfterEveryX)
             {
                 var lowestId = activeEnumerators.Min(e => e.CurrentId);
-                if (lowestId == null) return true; // there is at least 1 enumerator that hasnt read even the head. respect the reader and short circuit
-                metadata.GetIdsThrough(lowestId.Value, out var ids);
-                foreach (var id in ids)
+                // If lowestId is null, check if there are active enumerators
+                if (lowestId == null)
                 {
-                    RemoveInternal(id, out _);
+                    // If there are active enumerators, at least one hasn't read the head yet - respect the reader
+                    if (activeEnumerators.Count > 0) return true;
+                    // If there are no active enumerators, evict all entries up to the tail
+                    lowestId = metadata.TailId;
+                }
+                if (lowestId != null)
+                {
+                    metadata.GetIdsThrough(lowestId.Value, out var ids);
+                    foreach (var id in ids)
+                    {
+                        RemoveInternal(id, out _);
+                    }
                 }
                 additionsSinceLastEviction = 0;
             }
@@ -455,8 +469,8 @@ namespace Baubit.Caching
         /// <returns>An asynchronous enumerator for the cache entries.</returns>
         public IAsyncEnumerator<IEntry<TValue>> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
-            var retVal = new CacheAsyncEnumerator<TValue>(this, e => activeEnumerators.Remove(e), cancellationToken);
-            activeEnumerators.Add(retVal);
+            var retVal = enumeratorFactory.CreateEnumerator(this, e => activeEnumerators.Remove(e), cancellationToken);
+            activeEnumerators.Add(retVal as ICacheEnumerator);
             return retVal;
         }
 
@@ -468,8 +482,8 @@ namespace Baubit.Caching
         /// <returns>An asynchronous enumerator for future cache entries.</returns>
         public IAsyncEnumerator<IEntry<TValue>> GetFutureAsyncEnumerator(CancellationToken cancellationToken = default)
         {
-            var retVal = new CacheFutureAsyncEnumerator<TValue>(this, e => activeEnumerators.Remove(e), cancellationToken);
-            activeEnumerators.Add(retVal);
+            var retVal = enumeratorFactory.CreateFutureEnumerator(this, e => activeEnumerators.Remove(e), cancellationToken);
+            activeEnumerators.Add(retVal as ICacheEnumerator);
             return retVal;
         }
 
