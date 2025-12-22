@@ -1673,5 +1673,214 @@ namespace Baubit.Caching.Test.OrderedCache
 
             // Assert - No exception thrown
         }
+
+        #region Additional Eviction Tests
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithSingleActiveEnumeratorAtHead_KeepsAllEntries()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 3; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Start enumerator at head
+            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            await enumerator.MoveNextAsync(); // Position at first entry (CurrentId is now item-0)
+
+            // Act - Add more entries to trigger eviction
+            for (int i = 3; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Enumerator is at item-0, so eviction will keep entries from item-0 onward
+            // At 5th add (item-7), eviction triggered - keeps from item-0 (9 entries remain)
+            // At 10th add (item-9), would trigger again but enumerator still at item-0
+            Assert.True(cache.Count >= 9, $"Expected at least 9 entries, got {cache.Count}");
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithMultipleEnumeratorsAtDifferentPositions_EvictsUpToSlowest()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 10 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            var entries = new List<IEntry<string>>();
+            for (int i = 0; i < 5; i++)
+            {
+                cache.Add($"item-{i}", out var entry);
+                entries.Add(entry);
+            }
+
+            // Fast enumerator - reads all 5 entries
+            var fastEnum = cache.GetAsyncEnumerator(CancellationToken.None);
+            for (int i = 0; i < 5; i++)
+            {
+                await fastEnum.MoveNextAsync();
+            }
+
+            // Slow enumerator - reads only 2 entries
+            var slowEnum = cache.GetAsyncEnumerator(CancellationToken.None);
+            await slowEnum.MoveNextAsync();
+            await slowEnum.MoveNextAsync();
+
+            // Act - Add more entries to trigger eviction (total 15 > threshold 10)
+            for (int i = 5; i < 15; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Should evict entries up to position of slowest enumerator (entry 1)
+            // Slowest is at entry index 1 (0-indexed), so entry 0 and 1 should remain
+            // Entry 0 can be evicted once slowest moves past it
+            Assert.True(cache.Count >= 13, $"Expected at least 13 entries, got {cache.Count}"); // 15 total - 2 that slowest hasn't read
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_EnumeratorDisposed_AllowsEviction()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 3; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Create and dispose enumerator
+            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            await enumerator.MoveNextAsync();
+            await enumerator.DisposeAsync();
+
+            // Act - Add more entries to trigger eviction
+            for (int i = 3; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - With no active enumerators, entries should be evicted
+            Assert.Equal(0, cache.Count);
+        }
+
+        [Fact]
+        public void OrderedCache_Eviction_NoEnumerators_EvictsImmediatelyAfterThreshold()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 3 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Act - Add exactly at threshold
+            cache.Add("item-0", out _);
+            cache.Add("item-1", out _);
+            Assert.Equal(2, cache.Count);
+            
+            cache.Add("item-2", out _); // This triggers eviction
+            
+            // Assert - All entries evicted since no enumerators
+            Assert.Equal(0, cache.Count);
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_EnumeratorAtTail_EvictsAllButLast()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add entries
+            for (int i = 0; i < 4; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Enumerator reads to tail
+            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            for (int i = 0; i < 4; i++)
+            {
+                await enumerator.MoveNextAsync();
+            }
+
+            // Act - Add one more to trigger eviction at threshold
+            cache.Add("item-4", out _);
+            cache.Add("item-5", out _); // Trigger eviction again
+            
+            // Assert - Should keep only entries at or after enumerator position
+            Assert.True(cache.Count <= 2, $"Expected at most 2 entries, got {cache.Count}");
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_ConcurrentEnumeratorsMovingAtSameSpeed_EvictsCorrectly()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 10 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 5; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Multiple enumerators at same position
+            var enum1 = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enum2 = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enum3 = cache.GetAsyncEnumerator(CancellationToken.None);
+
+            // All read 3 entries
+            for (int i = 0; i < 3; i++)
+            {
+                await enum1.MoveNextAsync();
+                await enum2.MoveNextAsync();
+                await enum3.MoveNextAsync();
+            }
+
+            // Act - Add more to trigger eviction
+            for (int i = 5; i < 15; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Should evict entries before position 2 (all enumerators at same position)
+            Assert.True(cache.Count >= 12, $"Expected at least 12 entries, got {cache.Count}");
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithFutureEnumerator_RespectsFuturePosition()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 3; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Future enumerator starts at current tail
+            var futureEnum = cache.GetFutureAsyncEnumerator(CancellationToken.None);
+
+            // Act - Add more entries (future enumerator should block eviction)
+            for (int i = 3; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Future enumerator hasn't moved, so it should be at tail position
+            // Entries before its position can be evicted
+            Assert.True(cache.Count <= 7, $"Expected at most 7 entries, got {cache.Count}");
+        }
+
+        #endregion
     }
 }

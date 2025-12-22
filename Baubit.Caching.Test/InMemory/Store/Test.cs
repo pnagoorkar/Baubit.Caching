@@ -128,7 +128,7 @@ namespace Baubit.Caching.Test.InMemory.Store
             Assert.NotNull(entry);
             Assert.NotEqual(Guid.Empty, entry.Id);
             Assert.Equal("test value", entry.Value);
-            Assert.NotNull(entry.CreatedOnUTC);
+            Assert.NotEqual(default(DateTime), entry.CreatedOnUTC);
         }
 
         [Fact]
