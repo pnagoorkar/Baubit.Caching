@@ -32,7 +32,7 @@ namespace Baubit.Caching
         private readonly ILogger<OrderedCache<TValue>> logger;
         private readonly ICacheAsyncEnumeratorFactory<TValue> enumeratorFactory;
 
-        private readonly IList<ICacheEnumerator> activeEnumerators = new ConcurrentList<ICacheEnumerator>();
+        private readonly CacheEnumeratorCollection activeEnumerators;
         private int additionsSinceLastEviction = 0;
         #endregion
 
@@ -59,12 +59,14 @@ namespace Baubit.Caching
         /// <param name="l2Store">Backing L2 store that must persist every entry.</param>
         /// <param name="metadata">Metadata that tracks head/tail ids and next-id lookups.</param>
         /// <param name="loggerFactory">Factory to create a logger for diagnostics and tracing.</param>
+        /// <param name="cacheEnumeratorCollectionFactory">Optional factory for creating a cache enumerator collection. If null, uses default collection.</param>
         /// <param name="enumeratorFactory">Optional factory for creating enumerators. If null, uses default factory.</param>
         public OrderedCache(Configuration cacheConfiguration,
                             IStore<TValue> l1Store,
                             IStore<TValue> l2Store,
                             IMetadata metadata,
                             ILoggerFactory loggerFactory,
+                            Func<CacheEnumeratorCollection> cacheEnumeratorCollectionFactory = null,
                             ICacheAsyncEnumeratorFactory<TValue> enumeratorFactory = null)
         {
             logger = loggerFactory.CreateLogger<OrderedCache<TValue>>();
@@ -72,6 +74,7 @@ namespace Baubit.Caching
             this.l1Store = l1Store;
             this.l2Store = l2Store;
             this.metadata = metadata;
+            this.activeEnumerators = cacheEnumeratorCollectionFactory?.Invoke() ?? new CacheEnumeratorCollection();
             this.enumeratorFactory = enumeratorFactory ?? new CacheAsyncEnumeratorFactory<TValue>();
             if (this.l1Store != null && !this.l1Store.Uncapped && Configuration?.RunAdaptiveResizing == true)
             {
@@ -160,7 +163,7 @@ namespace Baubit.Caching
         {
             if (Configuration != null && ++additionsSinceLastEviction >= Configuration.EvictAfterEveryX)
             {
-                var lowestId = activeEnumerators.Min(e => e.CurrentId);
+                var lowestId = activeEnumerators.LowestReadId;
                 // If lowestId is null, check if there are active enumerators
                 if (lowestId == null)
                 {
