@@ -9,6 +9,12 @@ using System.Threading.Tasks;
 
 namespace Baubit.Caching
 {
+    /// <summary>
+    /// Abstract base class for ordered cache implementations with generic identifier support.
+    /// Provides two-tier storage (L1/L2), adaptive resizing, and async enumeration capabilities.
+    /// </summary>
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
+    /// <typeparam name="TValue">The type of values stored in the cache.</typeparam>
     public abstract class OrderedCache<TId, TValue> : IOrderedCache<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
@@ -46,6 +52,16 @@ namespace Baubit.Caching
         protected readonly ReaderWriterLockSlim Locker = new ReaderWriterLockSlim();
         #endregion
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrderedCache{TId, TValue}"/> class.
+        /// </summary>
+        /// <param name="cacheConfiguration">The cache configuration.</param>
+        /// <param name="l1Store">Optional bounded L1 store (e.g., in-memory) for hot entries.</param>
+        /// <param name="l2Store">Backing L2 store that must persist every entry.</param>
+        /// <param name="metadata">Metadata that tracks head/tail ids and next-id lookups.</param>
+        /// <param name="loggerFactory">Factory to create a logger for diagnostics and tracing.</param>
+        /// <param name="cacheEnumeratorCollectionFactory">Optional factory for creating a cache enumerator collection. If null, uses default collection.</param>
+        /// <param name="enumeratorFactory">Optional factory for creating enumerators. If null, uses default factory.</param>
         public OrderedCache(Configuration cacheConfiguration,
                             IStore<TId, TValue> l1Store,
                             IStore<TId, TValue> l2Store,

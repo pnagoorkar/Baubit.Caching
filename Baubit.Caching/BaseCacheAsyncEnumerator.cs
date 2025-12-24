@@ -8,6 +8,7 @@ namespace Baubit.Caching
     /// <summary>
     /// Base class for asynchronous enumerators over cache entries.
     /// </summary>
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
     /// <typeparam name="TValue">The type of value in the cache entry.</typeparam>
     public abstract class BaseCacheAsyncEnumerator<TId, TValue> : IAsyncEnumerator<IEntry<TId, TValue>>, ICacheEnumerator<TId> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
@@ -25,7 +26,7 @@ namespace Baubit.Caching
         private CancellationToken cancellationToken;
         private CancellationTokenRegistration cancellationTokenRegistration;
         /// <summary>
-        /// Initializes a new instance of the <see cref="BaseCacheAsyncEnumerator{TValue}"/> class.
+        /// Initializes a new instance of the <see cref="BaseCacheAsyncEnumerator{TId, TValue}"/> class.
         /// </summary>
         /// <param name="cache">The cache to enumerate.</param>
         /// <param name="onDispose">Callback invoked when the enumerator is disposed.</param>

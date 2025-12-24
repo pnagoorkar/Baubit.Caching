@@ -3,6 +3,13 @@ using System;
 
 namespace Baubit.Caching
 {
+    /// <summary>
+    /// Abstract base class for store implementations with generic identifier support.
+    /// Provides capacity management, growth/shrink logic, and common disposal patterns.
+    /// Subclasses must implement storage operations (Add, Get, Remove, Update).
+    /// </summary>
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
+    /// <typeparam name="TValue">The type of values stored in this store.</typeparam>
     public abstract class Store<TId, TValue> : IStore<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <inheritdoc/>
@@ -31,7 +38,7 @@ namespace Baubit.Caching
         private bool disposedValue;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Store{TValue}"/> class with specified capacity bounds.
+        /// Initializes a new instance of the <see cref="Store{TId, TValue}"/> class with specified capacity bounds.
         /// </summary>
         /// <param name="minCap">Minimum capacity the store may shrink to, or <c>null</c> for uncapped.</param>
         /// <param name="maxCap">Maximum capacity the store may grow to, or <c>null</c> for uncapped.</param>
@@ -103,7 +110,7 @@ namespace Baubit.Caching
         protected abstract void DisposeInternal();
 
         /// <summary>
-        /// Releases the resources used by the <see cref="Store{TValue}"/> class.
+        /// Releases the resources used by the <see cref="Store{TId, TValue}"/> class.
         /// </summary>
         /// <param name="disposing">When <c>true</c>, called from <see cref="Dispose()"/>; otherwise from the finalizer.</param>
         protected virtual void Dispose(bool disposing)

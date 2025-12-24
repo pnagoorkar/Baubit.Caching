@@ -8,6 +8,7 @@ namespace Baubit.Caching
     /// Factory interface for creating cache enumerators.
     /// Enables dependency injection and testability by decoupling enumerator creation from the cache.
     /// </summary>
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
     /// <typeparam name="TValue">The type of value in the cache entries.</typeparam>
     public interface ICacheAsyncEnumeratorFactory<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
