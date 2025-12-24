@@ -29,7 +29,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             cache.Add("existing2", out _);
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
 
             // Add new entry after enumerator creation
             await Task.Delay(50);
@@ -53,7 +53,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             using var cache = CreateTestCache();
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
             var moveTask = enumerator.MoveNextAsync().AsTask();
 
             await Task.Delay(50);
@@ -78,7 +78,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             cache.Add("existing", out var existing);
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
             var initialCurrentId = enumerator.CurrentId;
 
             // Assert
@@ -96,7 +96,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             var cts = new CancellationTokenSource();
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator(cts.Token);
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator(cts.Token);
             var moveTask = enumerator.MoveNextAsync().AsTask();
 
             await Task.Delay(50);
@@ -119,9 +119,9 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             cache.Add("existing", out _);
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
 
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
 
             // Add entries and enumerate them
             cache.Add("future1", out _);

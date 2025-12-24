@@ -9,7 +9,7 @@ namespace Baubit.Caching
     /// Enables dependency injection and testability by decoupling enumerator creation from the cache.
     /// </summary>
     /// <typeparam name="TValue">The type of value in the cache entries.</typeparam>
-    public interface ICacheAsyncEnumeratorFactory<TValue>
+    public interface ICacheAsyncEnumeratorFactory<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Creates an asynchronous enumerator that iterates through cache entries from the current head.
@@ -18,9 +18,9 @@ namespace Baubit.Caching
         /// <param name="onDispose">Callback invoked when the enumerator is disposed.</param>
         /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
         /// <returns>An asynchronous enumerator for the cache entries.</returns>
-        IAsyncEnumerator<IEntry<TValue>> CreateEnumerator(
-            IOrderedCache<TValue> cache,
-            Action<ICacheEnumerator> onDispose,
+        IAsyncEnumerator<IEntry<TId, TValue>> CreateEnumerator(
+            IOrderedCache<TId, TValue> cache,
+            Action<ICacheEnumerator<TId>> onDispose,
             CancellationToken cancellationToken);
 
         /// <summary>
@@ -31,9 +31,9 @@ namespace Baubit.Caching
         /// <param name="onDispose">Callback invoked when the enumerator is disposed.</param>
         /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
         /// <returns>An asynchronous enumerator for future cache entries.</returns>
-        IAsyncEnumerator<IEntry<TValue>> CreateFutureEnumerator(
-            IOrderedCache<TValue> cache,
-            Action<ICacheEnumerator> onDispose,
+        IAsyncEnumerator<IEntry<TId, TValue>> CreateFutureEnumerator(
+            IOrderedCache<TId, TValue> cache,
+            Action<ICacheEnumerator<TId>> onDispose,
             CancellationToken cancellationToken);
     }
 }

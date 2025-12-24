@@ -2,16 +2,12 @@
 
 namespace Baubit.Caching
 {
-    /// <summary>
-    /// Represents a cache entry with an identifier, creation timestamp, and value.
-    /// </summary>
-    /// <typeparam name="TValue">The type of value stored in the entry.</typeparam>
-    public interface IEntry<TValue>
+    public interface IEntry<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Gets the unique identifier for this entry.
         /// </summary>
-        Guid Id { get; }
+        TId Id { get; }
         /// <summary>
         /// Gets the UTC timestamp when this entry was created.
         /// </summary>
@@ -20,5 +16,8 @@ namespace Baubit.Caching
         /// Gets the value stored in this entry.
         /// </summary>
         TValue Value { get; }
+    }
+    public interface IEntry<TValue> : IEntry<Guid, TValue>
+    {
     }
 }

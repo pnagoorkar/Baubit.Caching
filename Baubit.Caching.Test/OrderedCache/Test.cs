@@ -376,7 +376,7 @@ namespace Baubit.Caching.Test.OrderedCache
             cache.Add("third", out _);
 
             // Act
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             await foreach (var entry in cache.WithCancellation(CancellationToken.None))
             {
                 entries.Add(entry);
@@ -428,7 +428,7 @@ namespace Baubit.Caching.Test.OrderedCache
             var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
             using var cache = CreateTestCache(config: config);
             // Pre-populate cache
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 100; i++)
             {
                 cache.Add($"item-{i}", out var entry);
@@ -515,7 +515,7 @@ namespace Baubit.Caching.Test.OrderedCache
             // Disable eviction for this test since we're not using enumerators
             var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
             using var cache = CreateTestCache(config: config);
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 100; i++)
             {
                 cache.Add($"item-{i}", out var entry);
@@ -551,7 +551,7 @@ namespace Baubit.Caching.Test.OrderedCache
         {
             // Arrange
             using var cache = CreateTestCache();
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 50; i++)
             {
                 cache.Add($"original-{i}", out var entry);
@@ -589,7 +589,7 @@ namespace Baubit.Caching.Test.OrderedCache
             cache.Add("first", out var first);
 
             const int waiterCount = 10;
-            var tasks = new Task<IEntry<string>>[waiterCount];
+            var tasks = new Task<IEntry<Guid, string>>[waiterCount];
 
             // Act - Start multiple waiters
             for (int i = 0; i < waiterCount; i++)
@@ -620,7 +620,7 @@ namespace Baubit.Caching.Test.OrderedCache
             // Arrange
             using var cache = CreateTestCache();
             const int waiterCount = 10;
-            var tasks = new Task<IEntry<string>>[waiterCount];
+            var tasks = new Task<IEntry<Guid, string>>[waiterCount];
 
             // Act - Start multiple waiters on empty cache
             for (int i = 0; i < waiterCount; i++)
@@ -768,7 +768,7 @@ namespace Baubit.Caching.Test.OrderedCache
             cache.Add("initial", out var initial);
 
             var tasks = new List<Task>();
-            var nextResults = new System.Collections.Concurrent.ConcurrentBag<IEntry<string>>();
+            var nextResults = new System.Collections.Concurrent.ConcurrentBag<IEntry<Guid, string>>();
 
             // Act - Concurrent GetNextOrDefault and Add
             for (int i = 0; i < 10; i++)
@@ -1713,7 +1713,7 @@ namespace Baubit.Caching.Test.OrderedCache
             using var cache = CreateTestCache(config: config);
             
             // Add initial entries
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 5; i++)
             {
                 cache.Add($"item-{i}", out var entry);

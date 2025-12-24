@@ -30,7 +30,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             cache.Add("third", out _);
 
             // Act
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             await using var enumerator = cache.GetAsyncEnumerator();
 
             for (int i = 0; i < 3; i++)
@@ -73,7 +73,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             cache.Add("test", out var added);
 
             // Act
-            var enumerator = (Caching.CacheAsyncEnumerator<string>)cache.GetAsyncEnumerator();
+            var enumerator = (Caching.CacheAsyncEnumerator<Guid, string>)cache.GetAsyncEnumerator();
             await enumerator.MoveNextAsync();
             var currentId = enumerator.CurrentId;
 

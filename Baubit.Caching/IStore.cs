@@ -2,13 +2,7 @@
 
 namespace Baubit.Caching
 {
-    /// <summary>
-    /// Abstraction for a storage layer used by <see cref="IOrderedCache{TValue}"/> implementations.
-    /// A store may be capacity-bound (e.g., an in‑memory L1) or uncapped (e.g., a backing L2 store).
-    /// Implementations are expected to be thread-safe for concurrent readers/writers.
-    /// </summary>
-    /// <typeparam name="TValue">The value type stored in the cache.</typeparam>
-    public interface IStore<TValue> : IDisposable
+    public interface IStore<TId, TValue> : IDisposable where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Indicates whether this store has no capacity limit.
@@ -48,7 +42,7 @@ namespace Baubit.Caching
         /// </summary>
         /// <param name="entry">The entry instance to add.</param>
         /// <returns><c>true</c> if the entry was accepted; otherwise <c>false</c>.</returns>
-        bool Add(IEntry<TValue> entry);
+        bool Add(IEntry<TId, TValue> entry);
 
         /// <summary>
         /// Adds a new value to the store, creating a corresponding entry.
@@ -57,7 +51,7 @@ namespace Baubit.Caching
         /// <param name="value">The value to add.</param>
         /// <param name="entry">When the method returns <c>true</c>, contains the created entry.</param>
         /// <returns><c>true</c> if the value was added; otherwise <c>false</c>.</returns>
-        bool Add(Guid id, TValue value, out IEntry<TValue> entry);
+        bool Add(TId id, TValue value, out IEntry<TId, TValue> entry);
 
         /// <summary>
         /// Adds a new value to the store, with the store auto-generating the next identifier.
@@ -65,7 +59,7 @@ namespace Baubit.Caching
         /// <param name="value">The value to add.</param>
         /// <param name="entry">When the method returns <c>true</c>, contains the created entry with auto-generated ID.</param>
         /// <returns><c>true</c> if the value was added; otherwise <c>false</c>.</returns>
-        bool Add(TValue value, out IEntry<TValue> entry);
+        bool Add(TValue value, out IEntry<TId, TValue> entry);
 
         /// <summary>
         /// Increases the store capacity by the specified amount (implementation-defined semantics).
@@ -94,7 +88,7 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="entry">On success, the located entry; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetEntryOrDefault(Guid? id, out IEntry<TValue> entry);
+        bool GetEntryOrDefault(TId? id, out IEntry<TId, TValue> entry);
 
         /// <summary>
         /// Gets a value by identifier, or a default value if not present.
@@ -102,7 +96,7 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="value">On success, the located value; otherwise default.</param>
         /// <returns><c>true</c> if the lookup succeeded (even when not found); otherwise <c>false</c>.</returns>
-        bool GetValueOrDefault(Guid? id, out TValue value);
+        bool GetValueOrDefault(TId? id, out TValue value);
 
         /// <summary>
         /// Removes an entry by identifier.
@@ -110,14 +104,14 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="entry">On success, the removed entry.</param>
         /// <returns><c>true</c> if an entry was removed; otherwise <c>false</c>.</returns>
-        bool Remove(Guid id, out IEntry<TValue> entry);
+        bool Remove(TId id, out IEntry<TId, TValue> entry);
 
         /// <summary>
         /// Updates an entry in-place.
         /// </summary>
         /// <param name="entry">The entry to update (identifier and new value).</param>
         /// <returns><c>true</c> if the entry was updated; otherwise <c>false</c>.</returns>
-        bool Update(IEntry<TValue> entry);
+        bool Update(IEntry<TId, TValue> entry);
 
         /// <summary>
         /// Updates the value for a given identifier.
@@ -125,6 +119,15 @@ namespace Baubit.Caching
         /// <param name="id">The entry identifier.</param>
         /// <param name="value">The new value.</param>
         /// <returns><c>true</c> if the value was updated; otherwise <c>false</c>.</returns>
-        bool Update(Guid id, TValue value);
+        bool Update(TId id, TValue value);
+    }
+    /// <summary>
+    /// Abstraction for a storage layer used by <see cref="IOrderedCache{TValue}"/> implementations.
+    /// A store may be capacity-bound (e.g., an in‑memory L1) or uncapped (e.g., a backing L2 store).
+    /// Implementations are expected to be thread-safe for concurrent readers/writers.
+    /// </summary>
+    /// <typeparam name="TValue">The value type stored in the cache.</typeparam>
+    public interface IStore<TValue> : IStore<Guid, TValue>
+    {
     }
 }
