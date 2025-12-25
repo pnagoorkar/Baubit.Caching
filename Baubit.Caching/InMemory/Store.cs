@@ -112,8 +112,8 @@ namespace Baubit.Caching.InMemory
             // Optimize: avoid creating new Entry if we can update in-place
             if (data.TryGetValue(id, out var existingEntry))
             {
-                // Entry<TValue>.Value is an auto-property with setter, allowing in-place modification
-                if (existingEntry is Entry<TValue> typedEntry)
+                // Entry<TId, TValue>.Value is an auto-property with setter, allowing in-place modification
+                if (existingEntry is Entry<TId, TValue> typedEntry)
                 {
                     typedEntry.Value = value;
                     return true;
