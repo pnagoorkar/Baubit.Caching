@@ -1,21 +1,19 @@
-﻿using Baubit.Collections;
-using Baubit.Tasks;
+﻿using Baubit.Tasks;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Baubit.Caching
 {
     /// <summary>
-    /// Abstract base class for ordered cache implementations with generic identifier support.
+    /// Base class for ordered cache implementations with generic identifier support.
     /// Provides two-tier storage (L1/L2), adaptive resizing, and async enumeration capabilities.
     /// </summary>
     /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
     /// <typeparam name="TValue">The type of values stored in the cache.</typeparam>
-    public abstract class OrderedCache<TId, TValue> : IOrderedCache<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
+    public class OrderedCache<TId, TValue> : IOrderedCache<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Gets the runtime configuration for this cache instance.
