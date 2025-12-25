@@ -8,30 +8,31 @@ namespace Baubit.Caching
     /// <summary>
     /// Base class for asynchronous enumerators over cache entries.
     /// </summary>
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
     /// <typeparam name="TValue">The type of value in the cache entry.</typeparam>
-    public abstract class BaseCacheAsyncEnumerator<TValue> : IAsyncEnumerator<IEntry<TValue>>, ICacheEnumerator
+    public abstract class BaseCacheAsyncEnumerator<TId, TValue> : IAsyncEnumerator<IEntry<TId, TValue>>, ICacheEnumerator<TId> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Gets the current cache entry.
         /// </summary>
-        public IEntry<TValue> Current { get; protected set; }
+        public IEntry<TId, TValue> Current { get; protected set; }
         /// <summary>
         /// Gets the identifier of the current entry, or <c>null</c> if not positioned.
         /// </summary>
-        public Guid? CurrentId => Current?.Id;
+        public TId? CurrentId => Current?.Id;
 
-        protected readonly IOrderedCache<TValue> cache;
-        private Action<ICacheEnumerator> onDispose;
+        protected readonly IOrderedCache<TId, TValue> cache;
+        private Action<ICacheEnumerator<TId>> onDispose;
         private CancellationToken cancellationToken;
         private CancellationTokenRegistration cancellationTokenRegistration;
         /// <summary>
-        /// Initializes a new instance of the <see cref="BaseCacheAsyncEnumerator{TValue}"/> class.
+        /// Initializes a new instance of the <see cref="BaseCacheAsyncEnumerator{TId, TValue}"/> class.
         /// </summary>
         /// <param name="cache">The cache to enumerate.</param>
         /// <param name="onDispose">Callback invoked when the enumerator is disposed.</param>
         /// <param name="cancellationToken">A token to cancel the enumeration.</param>
-        public BaseCacheAsyncEnumerator(IOrderedCache<TValue> cache,
-                                    Action<ICacheEnumerator> onDispose,
+        public BaseCacheAsyncEnumerator(IOrderedCache<TId, TValue> cache,
+                                    Action<ICacheEnumerator<TId>> onDispose,
                                     CancellationToken cancellationToken = default)
         {
             this.cache = cache;

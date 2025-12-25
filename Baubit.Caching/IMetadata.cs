@@ -8,7 +8,7 @@ namespace Baubit.Caching
     /// <summary>
     /// Provides metadata and ordering information for cache entries.
     /// </summary>
-    public interface IMetadata : IDisposable
+    public interface IMetadata<TId> : IDisposable where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Gets the number of entries currently tracked by the metadata.
@@ -17,11 +17,11 @@ namespace Baubit.Caching
         /// <summary>
         /// Gets the identifier of the first (head) entry.
         /// </summary>
-        Guid? HeadId { get; }
+        TId? HeadId { get; }
         /// <summary>
         /// Gets the identifier of the last (tail) entry.
         /// </summary>
-        Guid? TailId { get; }
+        TId? TailId { get; }
         /// <summary>
         /// Resets and returns the room count used for adaptive resizing.
         /// </summary>
@@ -32,39 +32,46 @@ namespace Baubit.Caching
         /// </summary>
         /// <param name="id">The identifier to add as tail.</param>
         /// <returns><c>true</c> if the operation succeeded; otherwise <c>false</c>.</returns>
-        bool AddTail(Guid id);
+        bool AddTail(TId id);
         /// <summary>
         /// Determines whether the specified identifier is present in the metadata.
         /// </summary>
         /// <param name="id">The identifier to check.</param>
         /// <returns><c>true</c> if the identifier exists; otherwise <c>false</c>.</returns>
-        bool ContainsKey(Guid id);
+        bool ContainsKey(TId id);
         /// <summary>
         /// Gets the next identifier after the specified one.
         /// </summary>
         /// <param name="id">The current identifier.</param>
         /// <param name="nextId">On success, the next identifier; otherwise <c>null</c>.</param>
         /// <returns><c>true</c> if the lookup succeeded; otherwise <c>false</c>.</returns>
-        bool GetNextId(Guid? id, out Guid? nextId);
+        bool GetNextId(TId? id, out TId? nextId);
         /// <summary>
         /// Asynchronously gets the next identifier after the specified one.
         /// </summary>
         /// <param name="id">The current identifier.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A task that completes with the next identifier.</returns>
-        Task<Guid> GetNextIdAsync(Guid? id, CancellationToken cancellationToken);
+        Task<TId> GetNextIdAsync(TId? id, CancellationToken cancellationToken);
         /// <summary>
         /// Gets all identifiers from the head through the specified identifier, inclusive.
         /// </summary>
         /// <param name="id">The end identifier.</param>
         /// <param name="ids">On success, the sequence of identifiers.</param>
         /// <returns><c>true</c> if the operation succeeded; otherwise <c>false</c>.</returns>
-        bool GetIdsThrough(Guid id, out IEnumerable<Guid> ids);
+        bool GetIdsThrough(TId id, out IEnumerable<TId> ids);
         /// <summary>
         /// Removes the specified identifier from the metadata.
         /// </summary>
         /// <param name="id">The identifier to remove.</param>
         /// <returns><c>true</c> if the identifier was removed; otherwise <c>false</c>.</returns>
-        bool Remove(Guid id);
+        bool Remove(TId id);
+    }
+    /// <summary>
+    /// Metadata interface with Guid identifiers (GuidV7, time-ordered).
+    /// Specialization of <see cref="IMetadata{TId}"/> with Guid as the identifier type.
+    /// </summary>
+    public interface IMetadata : IMetadata<Guid>, IDisposable
+    {
     }
 }

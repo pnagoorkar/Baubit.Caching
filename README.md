@@ -13,7 +13,7 @@
 Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
 
 #### **In 30 seconds:** 
-`OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID). You can:
+`OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID) by default, or you can use custom ID types. You can:
 - fetch any entry by ID in O(1),
 - walk entries in chronological order,
 - `await foreach` future entries with zero polling,
@@ -167,17 +167,25 @@ while (await enumerator.MoveNextAsync()) // yields immediately when producer add
 
 ## Core Concepts
 
+### Generic ID Support
+
+`OrderedCache<TId, TValue>` supports generic identifier types. `TId` must be a struct implementing `IComparable<TId>` and `IEquatable<TId>`.
+
+**Built-in specialization**: `OrderedCache<TValue>` uses Guid (GuidV7, time-ordered) as the identifier type.
+
+**Custom ID types**: Implement `OrderedCache<TId, TValue>` with int, long, or custom structs for domain-specific ordering.
+
 ### Entry
 
-An `IEntry<TValue>` represents a cache entry:
-- **Id** (`Guid`): GuidV7 identifier (time-ordered, sortable)
+An `IEntry<TValue>` (or `IEntry<TId, TValue>`) represents a cache entry:
+- **Id** (`Guid` by default, or custom `TId`): Entry identifier
 - **CreatedOnUTC** (`DateTime`): UTC timestamp when entry was added
 - **Value** (`TValue`): The cached data
 
 ### Head and Tail
 
-- **Head**: The oldest entry (first added, lowest GuidV7 timestamp)
-- **Tail**: The newest entry (last added, highest GuidV7 timestamp)
+- **Head**: The oldest entry (first added)
+- **Tail**: The newest entry (last added)
 
 Operations like `GetFirstOrDefault` return the head; `GetLastOrDefault` returns the tail.
 
@@ -231,7 +239,9 @@ This ensures iteration continues even when entries are removed out-of-order.
 ## API Reference
 
 <details>
-<summary><strong>IOrderedCache&lt;TValue&gt;</strong> (click to expand)</summary>
+<summary><strong>IOrderedCache&lt;TValue&gt; (Guid-based)</strong> (click to expand)</summary>
+
+Specialized interface using Guid (GuidV7) identifiers. Inherits from `IOrderedCache<Guid, TValue>`.
 
 ```csharp
 public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisposable
@@ -255,6 +265,38 @@ public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisp
     // Asynchronous Operations
     Task<IEntry<TValue>> GetNextAsync(Guid? id = null, CancellationToken ct = default);
     Task<IEntry<TValue>> GetFutureFirstOrDefaultAsync(CancellationToken ct = default);
+}
+```
+</details>
+
+<details>
+<summary><strong>IOrderedCache&lt;TId, TValue&gt; (Generic)</strong> (click to expand)</summary>
+
+Generic interface supporting custom identifier types. `TId` must be a struct implementing `IComparable<TId>` and `IEquatable<TId>`.
+
+```csharp
+public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValue>>, IDisposable 
+    where TId : struct, IComparable<TId>, IEquatable<TId>
+{
+    long Count { get; }
+    
+    // Write Operations
+    bool Add(TValue value, out IEntry<TId, TValue> entry);
+    bool Update(TId id, TValue value);
+    bool Remove(TId id, out IEntry<TId, TValue> entry);
+    bool Clear();
+    
+    // Synchronous Read Operations
+    bool GetEntryOrDefault(TId? id, out IEntry<TId, TValue> entry);
+    bool GetNextOrDefault(TId? id, out IEntry<TId, TValue> entry);
+    bool GetFirstOrDefault(out IEntry<TId, TValue> entry);
+    bool GetFirstIdOrDefault(out TId? id);
+    bool GetLastOrDefault(out IEntry<TId, TValue> entry);
+    bool GetLastIdOrDefault(out TId? id);
+    
+    // Asynchronous Operations
+    Task<IEntry<TId, TValue>> GetNextAsync(TId? id = null, CancellationToken ct = default);
+    Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken ct = default);
 }
 ```
 </details>
@@ -291,6 +333,44 @@ var l2Store = new Store<string>(identityGenerator, loggerFactory); // Unbounded,
 using var cache = new OrderedCache<string>(
     config, l1Store, l2Store, metadata, loggerFactory
 );
+```
+
+### Custom ID Types
+
+To use custom identifier types, implement the abstract `Store<TId, TValue>` class and provide ID generation logic:
+
+```csharp
+using Baubit.Caching;
+using Baubit.Caching.InMemory;
+using Microsoft.Extensions.Logging;
+
+// Custom store with integer IDs
+public class IntIdStore<TValue> : Baubit.Caching.InMemory.Store<int, TValue>
+{
+    private int nextId = 1;
+    
+    public IntIdStore(long? minCap, long? maxCap, ILoggerFactory loggerFactory) 
+        : base(minCap, maxCap, loggerFactory) { }
+    
+    protected override int? GenerateNextId(int? lastGeneratedId)
+    {
+        return lastGeneratedId.HasValue ? lastGeneratedId.Value + 1 : nextId++;
+    }
+}
+
+// Usage
+var config = new Configuration { EvictAfterEveryX = 100 };
+using var loggerFactory = LoggerFactory.Create(builder => { });
+var metadata = new Metadata<int>(config, loggerFactory);
+var l1Store = new IntIdStore<string>(100, 1000, loggerFactory);
+var l2Store = new IntIdStore<string>(null, null, loggerFactory);
+
+using var cache = new OrderedCache<int, string>(
+    config, l1Store, l2Store, metadata, loggerFactory
+);
+
+cache.Add("value", out var entry);
+Console.WriteLine(entry.Id);  // e.g., 1, 2, 3...
 ```
 
 ### Write Operations
