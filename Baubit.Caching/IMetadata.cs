@@ -67,6 +67,10 @@ namespace Baubit.Caching
         /// <returns><c>true</c> if the identifier was removed; otherwise <c>false</c>.</returns>
         bool Remove(TId id);
     }
+    /// <summary>
+    /// Metadata interface with Guid identifiers (GuidV7, time-ordered).
+    /// Specialization of <see cref="IMetadata{TId}"/> with Guid as the identifier type.
+    /// </summary>
     public interface IMetadata : IMetadata<Guid>, IDisposable
     {
     }

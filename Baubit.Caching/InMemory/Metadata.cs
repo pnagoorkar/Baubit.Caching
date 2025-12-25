@@ -6,6 +6,12 @@ using System.Threading.Tasks;
 
 namespace Baubit.Caching.InMemory
 {
+    /// <summary>
+    /// In-memory implementation of <see cref="IMetadata{TId}"/> for tracking cache entry ordering with generic identifiers.
+    /// Uses a linked list for O(1) head/tail access and a dictionary for O(1) lookups.
+    /// Thread-safe when used with external synchronization.
+    /// </summary>
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
     public class Metadata<TId> : IMetadata<TId> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
@@ -43,6 +49,11 @@ namespace Baubit.Caching.InMemory
         private bool disposedValue;
 
         private ILogger<Metadata> logger;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Metadata{TId}"/> class.
+        /// </summary>
+        /// <param name="configuration">The cache configuration.</param>
+        /// <param name="loggerFactory">The logger factory for diagnostics.</param>
         public Metadata(Configuration configuration,
                         ILoggerFactory loggerFactory)
         {
