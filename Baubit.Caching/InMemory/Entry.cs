@@ -28,23 +28,4 @@ namespace Baubit.Caching.InMemory
             Value = value;
         }
     }
-
-    /// <summary>
-    /// In-memory cache entry with a Guid identifier (GuidV7, time-ordered).
-    /// Specialization of <see cref="Entry{TId, TValue}"/> with Guid as the identifier type.
-    /// </summary>
-    /// <typeparam name="TValue">The type of value stored in the entry.</typeparam>
-    public class Entry<TValue> : Entry<Guid, TValue>
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Entry{TValue}"/> class.
-        /// </summary>
-        /// <param name="id">The unique Guid identifier for this entry.</param>
-        /// <param name="value">The value to store.</param>
-        public Entry(Guid id, TValue value) : base(id, value)
-        {
-            Id = id;
-            Value = value;
-        }
-    }
 }

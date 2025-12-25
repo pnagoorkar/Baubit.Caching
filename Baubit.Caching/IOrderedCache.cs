@@ -104,13 +104,4 @@ namespace Baubit.Caching
         /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
         bool Clear();
     }
-    /// <summary>
-    /// An ordered, append-only cache with monotonically increasing identifiers.
-    /// Supports random access by id, forward iteration, and asynchronous waiting for the next entry.
-    /// Implementations are expected to be thread-safe for concurrent readers and writers.
-    /// </summary>
-    /// <typeparam name="TValue">The type of values held in the cache.</typeparam>
-    public interface IOrderedCache<TValue> : IOrderedCache<Guid, TValue>
-    {
-    }
 }

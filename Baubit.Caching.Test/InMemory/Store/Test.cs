@@ -15,7 +15,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Constructor_UncappedStore()
         {
             // Arrange & Act
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
 
             // Assert
             Assert.True(store.Uncapped);
@@ -30,7 +30,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Constructor_WithCapacity()
         {
             // Arrange & Act
-            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(10, 100, null, _loggerFactory);
 
             // Assert
             Assert.False(store.Uncapped);
@@ -45,9 +45,9 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_Entry_Success()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
-            var entry = new Entry<string>(id, "test");
+            var entry = new Guid7.InMemory.Entry<string>(id, "test");
 
             // Act
             var result = store.Add(entry);
@@ -64,7 +64,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_WithIdAndValue_Success()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
 
             // Act
@@ -81,7 +81,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_WhenCapacityExceeded_Fails()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(2, 2, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(2, 2, null, _loggerFactory);
             var id1 = Guid.NewGuid();
             var id2 = Guid.NewGuid();
             var id3 = Guid.NewGuid();
@@ -102,7 +102,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_DuplicateId_Fails()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
 
             // Act
@@ -118,7 +118,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_WithValueOnly_AutoGeneratesId_Success()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
 
             // Act
             var result = store.Add("test value", out var entry);
@@ -135,7 +135,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_WithValueOnly_MultipleEntries_GeneratesMonotonicIds()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
 
             // Act
             store.Add(1, out var entry1);
@@ -154,7 +154,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_WithValueOnly_WhenCapacityExceeded_Fails()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(2, 2, Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(2, 2, Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
 
             // Act
             var result1 = store.Add("first", out _);
@@ -171,7 +171,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Add_WithValueOnly_NoIdentityGenerator_Fails()
         {
             // Arrange - L1 store without identity generator
-            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(10, 100, null, _loggerFactory);
 
             // Act
             var result = store.Add("test value", out var entry);
@@ -185,7 +185,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_GetEntryOrDefault_ExistingId_ReturnsEntry()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
             store.Add(id, "test value", out _);
 
@@ -202,7 +202,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_GetEntryOrDefault_NonExistingId_ReturnsFalse()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
 
             // Act
@@ -217,7 +217,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_GetValueOrDefault_ExistingId_ReturnsValue()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
             store.Add(id, 123, out _);
 
@@ -233,7 +233,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_GetValueOrDefault_NonExistingId_ReturnsDefault()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
 
             // Act
@@ -248,7 +248,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Update_ExistingEntry_Success()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
             store.Add(id, "original", out _);
 
@@ -265,10 +265,10 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Update_WithEntry_Success()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<int>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
             store.Add(id, 10, out _);
-            var updatedEntry = new Entry<int>(id, 20);
+            var updatedEntry = new Guid7.InMemory.Entry<int>(id, 20);
 
             // Act
             var result = store.Update(updatedEntry);
@@ -283,9 +283,9 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Update_NonExistingEntry_Fails()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
-            var entry = new Entry<string>(id, "test");
+            var entry = new Guid7.InMemory.Entry<string>(id, "test");
 
             // Act
             var result = store.Update(entry);
@@ -298,7 +298,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Remove_ExistingEntry_Success()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
             store.Add(id, "test", out _);
 
@@ -316,7 +316,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Remove_NonExistingEntry_Fails()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             var id = Guid.NewGuid();
 
             // Act
@@ -331,7 +331,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_GetCount_ReturnsCorrectCount()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             store.Add(Guid.NewGuid(), "first", out _);
             store.Add(Guid.NewGuid(), "second", out _);
 
@@ -347,7 +347,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_AddCapacity_IncreasesCapacity()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(10, 100, null, _loggerFactory);
             var initialCapacity = store.TargetCapacity;
 
             // Act
@@ -362,7 +362,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_AddCapacity_RespectsMaxCapacity()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(10, 100, null, _loggerFactory);
 
             // Act
             var result = store.AddCapacity(200);
@@ -376,7 +376,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_CutCapacity_DecreasesCapacity()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(10, 100, null, _loggerFactory);
             store.AddCapacity(40); // Set to 50
             var beforeCut = store.TargetCapacity;
 
@@ -392,7 +392,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_CutCapacity_RespectsMinCapacity()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(10, 100, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(10, 100, null, _loggerFactory);
 
             // Act
             var result = store.CutCapacity(20);
@@ -406,7 +406,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_Dispose_ClearsData()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(Baubit.Identity.IdentityGenerator.CreateNew(), _loggerFactory);
             store.Add(Guid.NewGuid(), "test", out _);
 
             // Act
@@ -421,7 +421,7 @@ namespace Baubit.Caching.Test.InMemory.Store
         public void Store_CurrentCapacity_UpdatesAfterAddAndRemove()
         {
             // Arrange
-            var store = new Caching.InMemory.Store<string>(5, 10, null, _loggerFactory);
+            var store = new Guid7.InMemory.Store<string>(5, 10, null, _loggerFactory);
             Assert.Equal(5, store.CurrentCapacity);
 
             // Act - Add entries

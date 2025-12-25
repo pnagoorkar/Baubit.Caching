@@ -121,13 +121,4 @@ namespace Baubit.Caching
         /// <returns><c>true</c> if the value was updated; otherwise <c>false</c>.</returns>
         bool Update(TId id, TValue value);
     }
-    /// <summary>
-    /// Abstraction for a storage layer used by <see cref="IOrderedCache{TValue}"/> implementations.
-    /// A store may be capacity-bound (e.g., an in‑memory L1) or uncapped (e.g., a backing L2 store).
-    /// Implementations are expected to be thread-safe for concurrent readers/writers.
-    /// </summary>
-    /// <typeparam name="TValue">The value type stored in the cache.</typeparam>
-    public interface IStore<TValue> : IStore<Guid, TValue>
-    {
-    }
 }

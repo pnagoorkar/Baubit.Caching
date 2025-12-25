@@ -15,7 +15,7 @@ namespace Baubit.Caching.Test.InMemory.Entry
             var value = "test value";
 
             // Act
-            var entry = new Entry<string>(id, value);
+            var entry = new Guid7.InMemory.Entry<string>(id, value);
 
             // Assert
             Assert.Equal(id, entry.Id);
@@ -32,7 +32,7 @@ namespace Baubit.Caching.Test.InMemory.Entry
             var value = 42;
 
             // Act
-            var entry = new Entry<int>(id, value);
+            var entry = new Guid7.InMemory.Entry<int>(id, value);
 
             // Assert
             Assert.Equal(id, entry.Id);
@@ -47,7 +47,7 @@ namespace Baubit.Caching.Test.InMemory.Entry
             string? value = null;
 
             // Act
-            var entry = new Entry<string?>(id, value);
+            var entry = new Guid7.InMemory.Entry<string?>(id, value);
 
             // Assert
             Assert.Equal(id, entry.Id);
@@ -62,7 +62,7 @@ namespace Baubit.Caching.Test.InMemory.Entry
             var value = new { Name = "Test", Count = 123 };
 
             // Act
-            var entry = new Entry<object>(id, value);
+            var entry = new Guid7.InMemory.Entry<object>(id, value);
 
             // Assert
             Assert.Equal(id, entry.Id);
@@ -77,7 +77,7 @@ namespace Baubit.Caching.Test.InMemory.Entry
             var id = Guid.NewGuid();
 
             // Act
-            var entry = new Entry<string>(id, "test");
+            var entry = new Guid7.InMemory.Entry<string>(id, "test");
             var after = DateTime.UtcNow;
 
             // Assert
@@ -89,9 +89,9 @@ namespace Baubit.Caching.Test.InMemory.Entry
         public void Entry_MultipleEntries_HaveDifferentTimestamps()
         {
             // Arrange & Act
-            var entry1 = new Entry<string>(Guid.NewGuid(), "test1");
+            var entry1 = new Guid7.InMemory.Entry<string>(Guid.NewGuid(), "test1");
             Thread.Sleep(5); // Small delay to ensure different timestamp
-            var entry2 = new Entry<string>(Guid.NewGuid(), "test2");
+            var entry2 = new Guid7.InMemory.Entry<string>(Guid.NewGuid(), "test2");
 
             // Assert
             Assert.NotEqual(entry1.Id, entry2.Id);

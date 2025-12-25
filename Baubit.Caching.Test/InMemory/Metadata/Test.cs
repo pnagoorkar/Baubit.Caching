@@ -18,7 +18,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Constructor_InitializesEmpty()
         {
             // Arrange & Act
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
 
             // Assert
             Assert.Equal(0, metadata.Count);
@@ -30,7 +30,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_AddTail_FirstEntry_SetsHeadAndTail()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
 
             // Act
@@ -47,7 +47,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_AddTail_MultipleEntries_MaintainsOrder()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
             var id2 = GenerateNextId();
@@ -67,7 +67,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_ContainsKey_ExistingId_ReturnsTrue()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
             metadata.AddTail(id);
 
@@ -82,7 +82,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_ContainsKey_NonExistingId_ReturnsFalse()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
 
             // Act
@@ -96,7 +96,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_NullId_ReturnsHead()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
             var id2 = GenerateNextId();
@@ -114,7 +114,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_HeadId_ReturnsSecond()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
             var id2 = GenerateNextId();
@@ -132,7 +132,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_TailId_ReturnsNull()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
             var id2 = GenerateNextId();
@@ -150,7 +150,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_IdSmallerThanHead_ReturnsHead()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var smallerId = Guid.Parse("05000000-0000-0000-0000-000000000000");
@@ -169,7 +169,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public async Task Metadata_GetNextIdAsync_WhenNoNext_WaitsForNew()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
 
@@ -203,7 +203,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public async Task Metadata_GetNextIdAsync_WhenNextExists_ReturnsImmediately()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
             var id2 = GenerateNextId();
@@ -220,7 +220,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Remove_ExistingId_Success()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = GenerateNextId();
             metadata.AddTail(id1);
             var id2 = GenerateNextId();
@@ -240,7 +240,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Remove_NonExistingId_ReturnsFalse()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
 
             // Act
@@ -254,7 +254,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Remove_LastEntry_SetsHeadAndTailToNull()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
             metadata.AddTail(id);
 
@@ -272,7 +272,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_EmptyStore_ReturnsEmpty()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
 
             // Act
@@ -287,7 +287,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_IdBeforeHead_ReturnsEmpty()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var smallerId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             metadata.AddTail(id1);
@@ -304,7 +304,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_IdAtTail_ReturnsAllIds()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
@@ -328,7 +328,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_MiddleId_ReturnsPartialList()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
@@ -351,7 +351,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public async Task Metadata_ResetRoomCount_ReturnsAndResets()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration { RunAdaptiveResizing = true }, NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration { RunAdaptiveResizing = true }, NullLoggerFactory.Instance);
 
             // Add first entry
             var id1 = GenerateNextId();
@@ -383,7 +383,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_Dispose_CompletesSuccessfully()
         {
             // Arrange
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id = GenerateNextId();
             metadata.AddTail(id);
 
@@ -401,7 +401,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         {
             // Arrange - Tests line 62: out-of-order deletion scenario
             // When an id is not in IdNodeMap but is between head and tail
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id2 = Guid.Parse("20000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
@@ -422,7 +422,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetIdsThrough_IdNotInMap_ReturnsEmptyAndFalse()
         {
             // Arrange - Tests lines 106-110: edge case where id is in range but not in IdNodeMap
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var id1 = Guid.Parse("10000000-0000-0000-0000-000000000000");
             var id3 = Guid.Parse("30000000-0000-0000-0000-000000000000");
             var idNotInMap = Guid.Parse("20000000-0000-0000-0000-000000000000");
@@ -441,7 +441,7 @@ namespace Baubit.Caching.Test.InMemory.Metadata
         public void Metadata_GetNextId_EmptyMetadata_WithNonNullId_ReturnsNull()
         {
             // Arrange - Tests line 58: when HeadId is null but id is not null
-            var metadata = new Caching.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var metadata = new Guid7.InMemory.Metadata(new Caching.Configuration(), NullLoggerFactory.Instance);
             var someId = Guid.NewGuid();
 
             // Act

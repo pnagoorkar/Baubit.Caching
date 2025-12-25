@@ -11,19 +11,19 @@ namespace Baubit.Caching.Test.OrderedCache
     {
         private readonly ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
 
-        private Caching.OrderedCache<string> CreateTestCache(
+        private Guid7.OrderedCache<string> CreateTestCache(
             Caching.Configuration? config = null,
             long? l1MinCap = null,
             long? l1MaxCap = null)
         {
             config ??= new Caching.Configuration();
             var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-            var metadata = new Metadata(config, NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(identityGenerator, _loggerFactory);
+            var metadata = new Guid7.InMemory.Metadata(config, NullLoggerFactory.Instance);
+            var l2Store = new Guid7.InMemory.Store<string>(identityGenerator, _loggerFactory);
             // L1 store doesn't need an identity generator since it only stores entries created by L2
-            var l1Store = l1MinCap.HasValue ? new Caching.InMemory.Store<string>(l1MinCap, l1MaxCap, null, _loggerFactory) : null;
+            var l1Store = l1MinCap.HasValue ? new Guid7.InMemory.Store<string>(l1MinCap, l1MaxCap, null, _loggerFactory) : null;
 
-            return new Caching.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
+            return new Guid7.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
         }
 
         [Fact]
@@ -1239,11 +1239,11 @@ namespace Baubit.Caching.Test.OrderedCache
                 AdaptionWindowMS = 100
             };
             var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-            var metadata = new Metadata(config, NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(identityGenerator, _loggerFactory);
-            var l1Store = new Caching.InMemory.Store<string>(null, null, null, _loggerFactory); // Uncapped, no ID gen
+            var metadata = new Guid7.InMemory.Metadata(config, NullLoggerFactory.Instance);
+            var l2Store = new Guid7.InMemory.Store<string>(identityGenerator, _loggerFactory);
+            var l1Store = new Guid7.InMemory.Store<string>(null, null, null, _loggerFactory); // Uncapped, no ID gen
 
-            using var cache = new Caching.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
+            using var cache = new Guid7.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
 
             // Act
             for (int i = 0; i < 10; i++)

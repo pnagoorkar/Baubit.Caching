@@ -416,7 +416,6 @@ namespace Baubit.Caching
             try
             {
                 return ClearInternal();
-                //return l2Store.Clear() && (l1Store == null ? true : l1Store.Clear()) && metadata.Clear();
             }
             finally { Locker.ExitWriteLock(); }
         }
@@ -496,35 +495,5 @@ namespace Baubit.Caching
             GC.SuppressFinalize(this);
         }
 
-    }
-
-    /// <summary>
-    /// Default <see cref="IOrderedCache{TValue}"/> implementation that composes an optional bounded L1 store
-    /// and a required L2 store, with metadata to maintain ordering. Supports adaptive resizing of the L1 store.
-    /// </summary>
-    /// <typeparam name="TValue">The element type held in the cache.</typeparam>
-    public class OrderedCache<TValue> : OrderedCache<Guid, TValue>, IOrderedCache<TValue>
-    {
-
-        /// <summary>
-        /// Creates a new <see cref="OrderedCache{TValue}"/>.
-        /// </summary>
-        /// <param name="cacheConfiguration">The cache configuration.</param>
-        /// <param name="l1Store">Optional bounded L1 store (e.g., in-memory) for hot entries.</param>
-        /// <param name="l2Store">Backing L2 store that must persist every entry.</param>
-        /// <param name="metadata">Metadata that tracks head/tail ids and next-id lookups.</param>
-        /// <param name="loggerFactory">Factory to create a logger for diagnostics and tracing.</param>
-        /// <param name="cacheEnumeratorCollectionFactory">Optional factory for creating a cache enumerator collection. If null, uses default collection.</param>
-        /// <param name="enumeratorFactory">Optional factory for creating enumerators. If null, uses default factory.</param>
-        public OrderedCache(Configuration cacheConfiguration,
-                            IStore<TValue> l1Store,
-                            IStore<TValue> l2Store,
-                            IMetadata metadata,
-                            ILoggerFactory loggerFactory,
-                            Func<CacheEnumeratorCollection<Guid>> cacheEnumeratorCollectionFactory = null,
-                            ICacheAsyncEnumeratorFactory<Guid, TValue> enumeratorFactory = null) : base(cacheConfiguration, l1Store, l2Store, metadata, loggerFactory, cacheEnumeratorCollectionFactory, enumeratorFactory)
-        {
-
-        }
     }
 }

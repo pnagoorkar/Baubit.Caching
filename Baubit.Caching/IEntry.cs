@@ -17,12 +17,4 @@ namespace Baubit.Caching
         /// </summary>
         TValue Value { get; }
     }
-    /// <summary>
-    /// Represents a cache entry with a Guid identifier (GuidV7, time-ordered).
-    /// Specialization of <see cref="IEntry{TId, TValue}"/> with Guid as the identifier type.
-    /// </summary>
-    /// <typeparam name="TValue">The type of value stored in the entry.</typeparam>
-    public interface IEntry<TValue> : IEntry<Guid, TValue>
-    {
-    }
 }
