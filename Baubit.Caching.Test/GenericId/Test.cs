@@ -197,20 +197,18 @@ namespace Baubit.Caching.Test.GenericId
         /// </summary>
         private class IntStore<TValue> : Caching.InMemory.Store<int, TValue>
         {
-            private int nextId = 1;
-
             public IntStore(long? minCap, long? maxCap, ILoggerFactory loggerFactory)
-                : base(minCap, maxCap, loggerFactory)
+                : base(minCap, maxCap, GenerateNextIdStatic, loggerFactory)
             {
             }
 
-            protected override int? GenerateNextId(int? lastGeneratedId)
+            private static int? GenerateNextIdStatic(int? lastGeneratedId)
             {
                 if (lastGeneratedId.HasValue)
                 {
                     return lastGeneratedId.Value + 1;
                 }
-                return nextId++;
+                return null;
             }
         }
 

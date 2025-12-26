@@ -4,25 +4,20 @@ using System.Collections.Generic;
 
 namespace Baubit.Caching.InMemory
 {
-    /// <summary>
-    /// Abstract in-memory store implementation with generic identifier support.
-    /// Uses a dictionary for O(1) lookups. Subclasses must provide ID generation logic.
-    /// Thread-safe when used with external synchronization.
-    /// </summary>
-    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
-    /// <typeparam name="TValue">The type of values stored in this store.</typeparam>
-    public abstract class Store<TId, TValue> : Caching.Store<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
+    public class Store<TId, TValue> : Caching.Store<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         private readonly Dictionary<TId, IEntry<TId, TValue>> data = new Dictionary<TId, IEntry<TId, TValue>>();
         private TId? lastGeneratedId;
+        private Func<TId?, TId?> nextIdFactory;
         /// <summary>
         /// Initializes a new instance of the <see cref="Store{TId, TValue}"/> class with capacity bounds.
         /// </summary>
         /// <param name="minCap">Minimum capacity for the store.</param>
         /// <param name="maxCap">Maximum capacity for the store.</param>
         /// <param name="loggerFactory">Factory for creating loggers.</param>
-        protected Store(long? minCap, long? maxCap, ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
+        protected Store(long? minCap, long? maxCap, Func<TId?, TId?> nextIdFactory, ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
         {
+            this.nextIdFactory = nextIdFactory;
         }
 
         /// <inheritdoc/>
@@ -44,7 +39,7 @@ namespace Baubit.Caching.InMemory
         /// <inheritdoc/>
         public override bool Add(TValue value, out IEntry<TId, TValue> entry)
         {
-            var nextId = GenerateNextId(lastGeneratedId);
+            var nextId = nextIdFactory(lastGeneratedId);
             if (nextId == null)
             {
                 entry = default;
@@ -53,14 +48,6 @@ namespace Baubit.Caching.InMemory
             lastGeneratedId = nextId;
             return Add(nextId.Value, value, out entry);
         }
-
-        /// <summary>
-        /// Generates the next identifier for a new entry.
-        /// Subclasses must implement this to provide ID generation logic.
-        /// </summary>
-        /// <param name="lastGeneratedId">The last generated ID, or null if no IDs have been generated yet.</param>
-        /// <returns>The next ID to use, or null if ID generation fails.</returns>
-        protected abstract TId? GenerateNextId(TId? lastGeneratedId);
 
         /// <inheritdoc/>
         public override bool GetCount(out long count)

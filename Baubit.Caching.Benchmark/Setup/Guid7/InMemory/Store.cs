@@ -25,7 +25,7 @@ namespace Baubit.Caching.Benchmark.Setup.Guid7.InMemory
         public Store(long? minCap,
                      long? maxCap,
                      IIdentityGenerator identityGenerator,
-                     ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
+                     ILoggerFactory loggerFactory) : base(minCap, maxCap, lastGenId => GenerateNextId(lastGenId, identityGenerator), loggerFactory)
         {
             this.identityGenerator = identityGenerator;
             logger = loggerFactory.CreateLogger<Store<TValue>>();
@@ -41,8 +41,7 @@ namespace Baubit.Caching.Benchmark.Setup.Guid7.InMemory
 
         }
 
-        /// <inheritdoc/>
-        protected override Guid? GenerateNextId(Guid? lastGeneratedId)
+        private static Guid? GenerateNextId(Guid? lastGeneratedId, IIdentityGenerator identityGenerator)
         {
             if (identityGenerator == null) return null;
             // Initialize from last generated ID if available to ensure monotonicity

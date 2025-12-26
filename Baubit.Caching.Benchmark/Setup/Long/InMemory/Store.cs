@@ -9,7 +9,7 @@ namespace Baubit.Caching.Benchmark.Setup.Long.InMemory
 
         public Store(long? minCap,
                      long? maxCap,
-                     ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
+                     ILoggerFactory loggerFactory) : base(minCap, maxCap, GenerateNextId, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<Store<TValue>>();
         }
@@ -24,8 +24,7 @@ namespace Baubit.Caching.Benchmark.Setup.Long.InMemory
 
         }
 
-        /// <inheritdoc/>
-        protected override long? GenerateNextId(long? lastGeneratedId)
+        private static long? GenerateNextId(long? lastGeneratedId)
         {
             return lastGeneratedId.HasValue ? lastGeneratedId.Value + 1 : 1;
         }
