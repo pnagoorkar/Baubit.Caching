@@ -14,8 +14,9 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         /// <param name="minCap">Minimum capacity for the store.</param>
         /// <param name="maxCap">Maximum capacity for the store.</param>
+        /// <param name="nextIdFactory">Factory function to generate the next ID based on the last generated ID.</param>
         /// <param name="loggerFactory">Factory for creating loggers.</param>
-        protected Store(long? minCap, long? maxCap, Func<TId?, TId?> nextIdFactory, ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
+        public Store(long? minCap, long? maxCap, Func<TId?, TId?> nextIdFactory, ILoggerFactory loggerFactory) : base(minCap, maxCap, loggerFactory)
         {
             this.nextIdFactory = nextIdFactory;
         }
