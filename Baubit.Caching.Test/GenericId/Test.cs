@@ -204,11 +204,7 @@ namespace Baubit.Caching.Test.GenericId
 
             private static int? GenerateNextIdStatic(int? lastGeneratedId)
             {
-                if (lastGeneratedId.HasValue)
-                {
-                    return lastGeneratedId.Value + 1;
-                }
-                return null;
+                return lastGeneratedId.HasValue ? lastGeneratedId.Value + 1 : 1;
             }
         }
 
