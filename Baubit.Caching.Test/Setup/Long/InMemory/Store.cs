@@ -27,7 +27,7 @@ namespace Baubit.Caching.Test.Long.InMemory
         /// <inheritdoc/>
         protected override long? GenerateNextId(long? lastGeneratedId)
         {
-            return lastGeneratedId + 1;
+            return lastGeneratedId.HasValue ? lastGeneratedId.Value + 1 : 1;
         }
     }
 }
