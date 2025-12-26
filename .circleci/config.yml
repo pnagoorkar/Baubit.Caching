@@ -255,10 +255,6 @@ jobs:
       - run:
           name: Build
           command: dotnet_sign_and_build
-          
-      - run:
-          name: Pack_and_publish_github
-          command: pack_and_publish_signed
 
       - run:
           name: Pack_and_publish
