@@ -213,7 +213,7 @@ namespace Baubit.Caching.InMemory
         }
 
         /// <summary>
-        /// Releases the resources used by the <see cref="Metadata"/> class.
+        /// Releases the resources used by the <see cref="Metadata{TId}"/> class.
         /// </summary>
         /// <param name="disposing">Whether called from Dispose().</param>
         protected virtual void Dispose(bool disposing)

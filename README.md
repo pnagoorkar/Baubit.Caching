@@ -326,44 +326,34 @@ using Microsoft.Extensions.Logging;
 var config = new Configuration { EvictAfterEveryX = 100 };
 using var loggerFactory = LoggerFactory.Create(builder => { });
 var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-var metadata = new Metadata(config, loggerFactory);
-var l1Store = new Store<string>(100, 1000, null, loggerFactory); // Min: 100, Max: 1000
-var l2Store = new Store<string>(identityGenerator, loggerFactory); // Unbounded, generates IDs
+var metadata = new Metadata<Guid>(config, loggerFactory);
+var l1Store = new Store<Guid, string>(100, 1000, _ => null, loggerFactory); // Min: 100, Max: 1000, no ID gen
+var l2Store = new Store<Guid, string>(null, null, lastId => 
+{
+    if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+    return identityGenerator.GetNext();
+}, loggerFactory); // Unbounded, generates GuidV7 IDs
 
-using var cache = new OrderedCache<string>(
+using var cache = new OrderedCache<Guid, string>(
     config, l1Store, l2Store, metadata, loggerFactory
 );
 ```
 
 ### Custom ID Types
 
-To use custom identifier types, implement the abstract `Store<TId, TValue>` class and provide ID generation logic:
+To use custom identifier types, create Store instances with custom ID generation logic:
 
 ```csharp
 using Baubit.Caching;
 using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging;
 
-// Custom store with integer IDs
-public class IntIdStore<TValue> : Baubit.Caching.InMemory.Store<int, TValue>
-{
-    private int nextId = 1;
-    
-    public IntIdStore(long? minCap, long? maxCap, ILoggerFactory loggerFactory) 
-        : base(minCap, maxCap, loggerFactory) { }
-    
-    protected override int? GenerateNextId(int? lastGeneratedId)
-    {
-        return lastGeneratedId.HasValue ? lastGeneratedId.Value + 1 : nextId++;
-    }
-}
-
-// Usage
+// Usage with integer IDs
 var config = new Configuration { EvictAfterEveryX = 100 };
 using var loggerFactory = LoggerFactory.Create(builder => { });
 var metadata = new Metadata<int>(config, loggerFactory);
-var l1Store = new IntIdStore<string>(100, 1000, loggerFactory);
-var l2Store = new IntIdStore<string>(null, null, loggerFactory);
+var l1Store = new Store<int, string>(100, 1000, _ => null, loggerFactory); // No ID gen
+var l2Store = new Store<int, string>(null, null, lastId => lastId.HasValue ? lastId.Value + 1 : 1, loggerFactory); // Sequential IDs
 
 using var cache = new OrderedCache<int, string>(
     config, l1Store, l2Store, metadata, loggerFactory
