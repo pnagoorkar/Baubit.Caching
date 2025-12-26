@@ -56,7 +56,7 @@ dotnet add package Baubit.Caching
 
 ### TL;DR
 
-1. **Time-ordered IDs**: GuidV7 eliminates separate timestamp fields
+1. **Ordered IDs**: Chronologically sortable identifiers (e.g., GuidV7, int, long) eliminate separate timestamp fields
 2. **Transparent tiering**: L1/L2 fallback is invisible to consumers
 3. **Deletion-resilient iteration**: Removing entries mid-stream doesn't break enumeration
 4. **Memory safety**: Automatic eviction behind slowest consumer prevents leaks
@@ -64,20 +64,18 @@ dotnet add package Baubit.Caching
 
 ### In-Depth
 
-#### 1. Time-Ordered Identity Without Dual Fields
+#### 1. Chronologically Ordered Identity Without Dual Fields
 
 Event sourcing and audit logs need explicit time stamps for time-ordering:
 
 ```csharp
 // ❌ Redundant: Separate ID + Timestamp fields
-public record Event(Guid Id, DateTime Timestamp, string Data);
+public record Event(TId Id, DateTime Timestamp, string Data); // TId: Guid, int, long, etc.
 ```
-
-`OrderedCache` uses GuidV7 which embeds time-ordering in the ID itself:
 
 ```csharp
 // ✅ Efficient: Single sortable, time-ordered ID
-public record Event(Guid Id, string Data); // Id is naturally chronological
+public record Event(TId Id, string Data); // Id is naturally chronological
 ```
 
 #### 2. Transparent Multi-Tier Cache
