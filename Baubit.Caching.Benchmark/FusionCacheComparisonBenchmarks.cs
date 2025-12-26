@@ -19,7 +19,7 @@ namespace Baubit.Caching.Benchmark;
 [CategoriesColumn]
 public class FusionCacheComparisonBenchmarks
 {
-    private Setup.Long.OrderedCache<string>? _baubitCache;
+    private OrderedCache<long, string>? _baubitCache;
     private FusionCache? _fusionCache;
     private readonly List<long> _baubitEntryIds = new();
     private readonly List<string> _fusionCacheKeys = new();
@@ -39,12 +39,11 @@ public class FusionCacheComparisonBenchmarks
             EvictAfterEveryX = int.MaxValue
         };
 
-        var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-        var metadata = new Setup.Long.InMemory.Metadata(config, NullLoggerFactory.Instance);
-        var l1Store = new Setup.Long.InMemory.Store<string>(CacheSize / 10, CacheSize / 10, NullLoggerFactory.Instance);
-        var l2Store = new Setup.Long.InMemory.Store<string>(NullLoggerFactory.Instance);
+        var metadata = new Metadata<long>(config, NullLoggerFactory.Instance);
+        var l1Store = new InMemory.Store<long, string>(CacheSize / 10, CacheSize / 10, lastId => lastId.HasValue ? lastId.Value + 1 : 1, NullLoggerFactory.Instance);
+        var l2Store = new InMemory.Store<long, string>(null, null, lastId => lastId.HasValue ? lastId.Value + 1 : 1, NullLoggerFactory.Instance);
 
-        _baubitCache = new Setup.Long.OrderedCache<string>(
+        _baubitCache = new OrderedCache<long, string>(
             config,
             l1Store,
             l2Store,
