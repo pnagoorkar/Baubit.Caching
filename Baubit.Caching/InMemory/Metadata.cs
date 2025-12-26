@@ -48,7 +48,7 @@ namespace Baubit.Caching.InMemory
 
         private bool disposedValue;
 
-        private ILogger<Metadata> logger;
+        private ILogger<Metadata<TId>> logger;
         /// <summary>
         /// Initializes a new instance of the <see cref="Metadata{TId}"/> class.
         /// </summary>
@@ -57,7 +57,7 @@ namespace Baubit.Caching.InMemory
         public Metadata(Configuration configuration,
                         ILoggerFactory loggerFactory)
         {
-            logger = loggerFactory.CreateLogger<Metadata>();
+            logger = loggerFactory.CreateLogger<Metadata<TId>>();
             this.Configuration = configuration;
         }
 
@@ -238,23 +238,6 @@ namespace Baubit.Caching.InMemory
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
-        }
-    }
-    /// <summary>
-    /// In-memory implementation of <see cref="IMetadata"/> for tracking cache entry ordering and identifiers.
-    /// Thread-safe for concurrent access.
-    /// </summary>
-    public class Metadata : Metadata<Guid>, IMetadata
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Metadata"/> class.
-        /// </summary>
-        /// <param name="configuration">The cache configuration.</param>
-        /// <param name="loggerFactory">The logger factory for diagnostics.</param>
-        public Metadata(Configuration configuration, 
-                        ILoggerFactory loggerFactory) : base(configuration, loggerFactory)
-        {
-
         }
     }
 }

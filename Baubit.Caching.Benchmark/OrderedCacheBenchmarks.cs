@@ -16,8 +16,8 @@ namespace Baubit.Caching.Benchmark;
 [RankColumn]
 public class OrderedCacheBenchmarks
 {
-    private OrderedCache<string>? _cache;
-    private readonly List<Guid> _entryIds = new();
+    private Setup.Long.OrderedCache<string>? _cache;
+    private readonly List<long> _entryIds = new();
     private int _readIndex = 0;
 
     [Params(1_000, 10_000)]
@@ -33,11 +33,11 @@ public class OrderedCacheBenchmarks
         };
 
         var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-        var metadata = new Metadata(config, NullLoggerFactory.Instance);
-        var l1Store = new InMemory.Store<string>(CacheSize / 10, CacheSize / 10, null, NullLoggerFactory.Instance);
-        var l2Store = new InMemory.Store<string>(identityGenerator, NullLoggerFactory.Instance);
+        var metadata = new Setup.Long.InMemory.Metadata(config, NullLoggerFactory.Instance);
+        var l1Store = new Setup.Long.InMemory.Store<string>(CacheSize / 10, CacheSize / 10, NullLoggerFactory.Instance);
+        var l2Store = new Setup.Long.InMemory.Store<string>(NullLoggerFactory.Instance);
 
-        _cache = new OrderedCache<string>(
+        _cache = new Setup.Long.OrderedCache<string>(
             config,
             l1Store,
             l2Store,

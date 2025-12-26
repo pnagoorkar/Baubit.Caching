@@ -1,5 +1,4 @@
-﻿using Baubit.Caching.InMemory;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Baubit.Caching.Test.CacheAsyncEnumerator
@@ -11,13 +10,13 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
     {
         private readonly ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
 
-        private Caching.OrderedCache<string> CreateTestCache()
+        private Guid7.OrderedCache<string> CreateTestCache()
         {
             var config = new Caching.Configuration();
             var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-            var metadata = new Metadata(config, NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(identityGenerator, _loggerFactory);
-            return new Caching.OrderedCache<string>(config, null, l2Store, metadata, _loggerFactory);
+            var metadata = new Guid7.InMemory.Metadata(config, NullLoggerFactory.Instance);
+            var l2Store = new Guid7.InMemory.Store<string>(identityGenerator, _loggerFactory);
+            return new Guid7.OrderedCache<string>(config, null, l2Store, metadata, _loggerFactory);
         }
 
         [Fact]
