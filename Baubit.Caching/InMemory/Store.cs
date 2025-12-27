@@ -40,12 +40,15 @@ namespace Baubit.Caching.InMemory
             this.nextIdFactory = nextIdFactory;
         }
 
+        public override TId? LastAddedId { get; protected set; }
+
         /// <inheritdoc/>
         public override bool Add(IEntry<TId, TValue> entry)
         {
             if (!HasCapacity) return false;
             if (data.ContainsKey(entry.Id)) return false;
             data[entry.Id] = entry;
+            LastAddedId = entry.Id;
             return true;
         }
 

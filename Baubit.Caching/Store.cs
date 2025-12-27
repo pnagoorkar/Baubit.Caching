@@ -34,6 +34,8 @@ namespace Baubit.Caching
         /// <inheritdoc/>
         public bool HasCapacity { get => Uncapped || CurrentCapacity > 0; }
 
+        public abstract TId? LastAddedId { get; protected set; }
+
         private ILogger<Store<TId, TValue>> logger;
         private bool disposedValue;
 

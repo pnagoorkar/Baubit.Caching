@@ -37,6 +37,8 @@ namespace Baubit.Caching
         /// </summary>
         long? TargetCapacity { get; }
 
+        TId? LastAddedId { get; }
+
         /// <summary>
         /// Adds an existing entry instance to the store (e.g., promoting from another layer).
         /// </summary>

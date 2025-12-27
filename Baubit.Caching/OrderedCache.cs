@@ -39,11 +39,7 @@ namespace Baubit.Caching
         protected readonly IStore<TId, TValue> l1Store;
         protected readonly IStore<TId, TValue> l2Store;
         protected readonly IMetadata<TId> metadata;
-        /// <summary>
-        /// Tracks the ID of the last entry successfully added to the L1 store.
-        /// Used to maintain continuity when replenishing L1 from L2 without depending on store internals.
-        /// </summary>
-        protected TId? lastAddedL1Id;
+
         /// <summary>
         /// A reader/writer lock guarding mutations and multi-field reads to ensure thread safety.
         /// </summary>
@@ -141,10 +137,7 @@ namespace Baubit.Caching
                 if (!l2Store.Add(value, out entry)) return false;
                 if (l1Store?.HasCapacity == true)
                 {
-                    if (l1Store.Add(entry))
-                    {
-                        lastAddedL1Id = entry.Id;
-                    }
+                    l1Store.Add(entry);
                 }
                 if (!metadata.AddTail(entry.Id)) return false;
                 if (!TryEvict()) return false;
@@ -396,17 +389,15 @@ namespace Baubit.Caching
         /// <summary>
         /// Fills the L1 store from L2 until either L1 reaches its capacity or there are no more
         /// entries between the L1 tail and the global tail.
+        /// <para><b>Critical:</b> This method is <b>not thread-safe</b>. Callers are expected to ensure thread safety before calling.</para>
         /// </summary>
         /// <returns><c>true</c> always; the method is best‑effort.</returns>
-        private bool ReplenishL1Store()
+        protected bool ReplenishL1Store()
         {
             while (l1Store?.CurrentCapacity > 0 &&
-                   metadata.GetNextId(lastAddedL1Id, out var nextId) &&
+                   metadata.GetNextId(l1Store.LastAddedId, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
-                   nextEntry != null && l1Store.Add(nextEntry))
-            {
-                lastAddedL1Id = nextEntry.Id;
-            }
+                   nextEntry != null && l1Store.Add(nextEntry));
             return true;
         }
 
@@ -435,7 +426,6 @@ namespace Baubit.Caching
             {
                 RemoveInternal(id, out _);
             }
-            lastAddedL1Id = null; // Reset L1 tracking since cache is cleared
             return true;
         }
 
