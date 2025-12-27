@@ -394,7 +394,7 @@ namespace Baubit.Caching
         /// <returns><c>true</c> always; the method is best‑effort.</returns>
         protected bool ReplenishL1Store()
         {
-            while (l1Store?.CurrentCapacity > 0 &&
+            while (l1Store?.HasCapacity == true &&
                    metadata.GetNextId(l1Store.LastAddedId, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
                    nextEntry != null && l1Store.Add(nextEntry));
