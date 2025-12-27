@@ -156,9 +156,10 @@ namespace Baubit.Caching
         /// <summary>
         /// Attempts to evict entries that have been read by all active enumerators.
         /// Called periodically after a configured number of additions to maintain memory efficiency.
+        /// <para><b>Critical:</b> This method is <b>not thread-safe</b>. Callers are expected to ensure thread safety before calling.</para>
         /// </summary>
         /// <returns><c>true</c> on success; otherwise <c>false</c>.</returns>
-        private bool TryEvict()
+        protected bool TryEvict()
         {
             if (Configuration != null && ++additionsSinceLastEviction >= Configuration.EvictAfterEveryX)
             {
