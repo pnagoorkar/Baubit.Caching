@@ -8,7 +8,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)<br/>
 [![Known Vulnerabilities](https://snyk.io/test/github/pnagoorkar/Baubit.Caching/badge.svg)](https://snyk.io/test/github/pnagoorkar/Baubit.Caching)
 
-**DI Extension**: [Baubit.Caching.DI](https://github.com/pnagoorkar/Baubit.Caching.DI)
+**DI Extension**: [Baubit.Caching.DI](https://github.com/pnagoorkar/Baubit.Caching.DI)  
+**Extensions for v2025.52+ breaking changes**: [Baubit.Caching.Extensions](https://github.com/pnagoorkar/Baubit.Caching.Extensions)  
+**LiteDB persistence**: [Baubit.Caching.LiteDB](https://github.com/pnagoorkar/Baubit.Caching.LiteDB)  
+**Distributed cache samples**: [Samples](https://github.com/pnagoorkar/Baubit.Caching.DI/tree/master/Samples)
 
 Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
 
@@ -217,7 +220,7 @@ This ensures iteration continues even when entries are removed out-of-order.
 |           │                         │                 |
 |           └───────────┬─────────────┘                 |
 |                       │                               |
-|               +-------▼--------+                      |
+|               +-------▲--------+                      |
 |               |    Metadata    |                      |
 |               |  (LinkedList)  |                      |
 |               +----------------+                      |
