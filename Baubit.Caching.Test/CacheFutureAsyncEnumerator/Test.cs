@@ -1,6 +1,7 @@
 ﻿using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System;
 
 namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
 {
@@ -11,12 +12,17 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
     {
         private readonly ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
 
-        private Caching.OrderedCache<string> CreateTestCache()
+        private OrderedCache<Guid, string> CreateTestCache()
         {
             var config = new Caching.Configuration();
-            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
-            return new Caching.OrderedCache<string>(config, null, l2Store, metadata, _loggerFactory);
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => 
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+            return new OrderedCache<Guid, string>(config, null, l2Store, metadata, _loggerFactory);
         }
 
         [Fact]
@@ -28,7 +34,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             cache.Add("existing2", out _);
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
 
             // Add new entry after enumerator creation
             await Task.Delay(50);
@@ -52,7 +58,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             using var cache = CreateTestCache();
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
             var moveTask = enumerator.MoveNextAsync().AsTask();
 
             await Task.Delay(50);
@@ -77,7 +83,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             cache.Add("existing", out var existing);
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
             var initialCurrentId = enumerator.CurrentId;
 
             // Assert
@@ -95,7 +101,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             var cts = new CancellationTokenSource();
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator(cts.Token);
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator(cts.Token);
             var moveTask = enumerator.MoveNextAsync().AsTask();
 
             await Task.Delay(50);
@@ -118,9 +124,9 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             cache.Add("existing", out _);
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<string>)cache.GetFutureAsyncEnumerator();
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
 
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
 
             // Add entries and enumerate them
             cache.Add("future1", out _);

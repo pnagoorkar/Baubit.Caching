@@ -8,12 +8,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)<br/>
 [![Known Vulnerabilities](https://snyk.io/test/github/pnagoorkar/Baubit.Caching/badge.svg)](https://snyk.io/test/github/pnagoorkar/Baubit.Caching)
 
-**DI Extension**: [Baubit.Caching.DI](https://github.com/pnagoorkar/Baubit.Caching.DI)
+**DI Extension**: [Baubit.Caching.DI](https://github.com/pnagoorkar/Baubit.Caching.DI)  
+**Extensions for v2025.52+ breaking changes**: [Baubit.Caching.Extensions](https://github.com/pnagoorkar/Baubit.Caching.Extensions)  
+**LiteDB persistence**: [Baubit.Caching.LiteDB](https://github.com/pnagoorkar/Baubit.Caching.LiteDB)  
+**Distributed cache samples**: [Samples](https://github.com/pnagoorkar/Baubit.Caching.DI/tree/master/Samples)
 
 Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
 
 #### **In 30 seconds:** 
-`OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID). You can:
+`OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID) by default, or you can use custom ID types. You can:
 - fetch any entry by ID in O(1),
 - walk entries in chronological order,
 - `await foreach` future entries with zero polling,
@@ -56,7 +59,7 @@ dotnet add package Baubit.Caching
 
 ### TL;DR
 
-1. **Time-ordered IDs**: GuidV7 eliminates separate timestamp fields
+1. **Ordered IDs**: Chronologically sortable identifiers (e.g., GuidV7, int, long) eliminate separate timestamp fields
 2. **Transparent tiering**: L1/L2 fallback is invisible to consumers
 3. **Deletion-resilient iteration**: Removing entries mid-stream doesn't break enumeration
 4. **Memory safety**: Automatic eviction behind slowest consumer prevents leaks
@@ -64,20 +67,18 @@ dotnet add package Baubit.Caching
 
 ### In-Depth
 
-#### 1. Time-Ordered Identity Without Dual Fields
+#### 1. Chronologically Ordered Identity Without Dual Fields
 
 Event sourcing and audit logs need explicit time stamps for time-ordering:
 
 ```csharp
 // ❌ Redundant: Separate ID + Timestamp fields
-public record Event(Guid Id, DateTime Timestamp, string Data);
+public record Event(TId Id, DateTime Timestamp, string Data); // TId: Guid, int, long, etc.
 ```
-
-`OrderedCache` uses GuidV7 which embeds time-ordering in the ID itself:
 
 ```csharp
 // ✅ Efficient: Single sortable, time-ordered ID
-public record Event(Guid Id, string Data); // Id is naturally chronological
+public record Event(TId Id, string Data); // Id is naturally chronological
 ```
 
 #### 2. Transparent Multi-Tier Cache
@@ -167,17 +168,25 @@ while (await enumerator.MoveNextAsync()) // yields immediately when producer add
 
 ## Core Concepts
 
+### Generic ID Support
+
+`OrderedCache<TId, TValue>` supports generic identifier types. `TId` must be a struct implementing `IComparable<TId>` and `IEquatable<TId>`.
+
+**Built-in specialization**: `OrderedCache<TValue>` uses Guid (GuidV7, time-ordered) as the identifier type.
+
+**Custom ID types**: Implement `OrderedCache<TId, TValue>` with int, long, or custom structs for domain-specific ordering.
+
 ### Entry
 
-An `IEntry<TValue>` represents a cache entry:
-- **Id** (`Guid`): GuidV7 identifier (time-ordered, sortable)
+An `IEntry<TValue>` (or `IEntry<TId, TValue>`) represents a cache entry:
+- **Id** (`Guid` by default, or custom `TId`): Entry identifier
 - **CreatedOnUTC** (`DateTime`): UTC timestamp when entry was added
 - **Value** (`TValue`): The cached data
 
 ### Head and Tail
 
-- **Head**: The oldest entry (first added, lowest GuidV7 timestamp)
-- **Tail**: The newest entry (last added, highest GuidV7 timestamp)
+- **Head**: The oldest entry (first added)
+- **Tail**: The newest entry (last added)
 
 Operations like `GetFirstOrDefault` return the head; `GetLastOrDefault` returns the tail.
 
@@ -211,7 +220,7 @@ This ensures iteration continues even when entries are removed out-of-order.
 |           │                         │                 |
 |           └───────────┬─────────────┘                 |
 |                       │                               |
-|               +-------▼--------+                      |
+|               +-------▲--------+                      |
 |               |    Metadata    |                      |
 |               |  (LinkedList)  |                      |
 |               +----------------+                      |
@@ -219,19 +228,21 @@ This ensures iteration continues even when entries are removed out-of-order.
 ```
 
 - **L1 Store**: Optional bounded in-memory cache (hot entries, configurable min/max capacity)
-- **L2 Store**: Required **unbounded** backing store (holds all entries)
+- **L2 Store**: Required **unbounded** backing store (holds all entries, generates GuidV7 IDs)
 - **Metadata**: Ordered doubly-linked list of GuidV7 IDs with O(1) head/tail access
 - **Concurrency**: `ReaderWriterLockSlim` for concurrent access (multiple readers, single writer)
 
 **Flow:**
-1. `Add` inserts to L2, then replenishes L1 if space available
+1. `Add` generates ID in L2, inserts to L2, then replenishes L1 if space available
 2. `GetEntryOrDefault` checks L1 first, falls back to L2 on miss
 3. Eviction removes entries from both L1 and L2 based on slowest enumerator position
 
 ## API Reference
 
 <details>
-<summary><strong>IOrderedCache&lt;TValue&gt;</strong> (click to expand)</summary>
+<summary><strong>IOrderedCache&lt;TValue&gt; (Guid-based)</strong> (click to expand)</summary>
+
+Specialized interface using Guid (GuidV7) identifiers. Inherits from `IOrderedCache<Guid, TValue>`.
 
 ```csharp
 public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisposable
@@ -260,6 +271,38 @@ public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisp
 </details>
 
 <details>
+<summary><strong>IOrderedCache&lt;TId, TValue&gt; (Generic)</strong> (click to expand)</summary>
+
+Generic interface supporting custom identifier types. `TId` must be a struct implementing `IComparable<TId>` and `IEquatable<TId>`.
+
+```csharp
+public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValue>>, IDisposable 
+    where TId : struct, IComparable<TId>, IEquatable<TId>
+{
+    long Count { get; }
+    
+    // Write Operations
+    bool Add(TValue value, out IEntry<TId, TValue> entry);
+    bool Update(TId id, TValue value);
+    bool Remove(TId id, out IEntry<TId, TValue> entry);
+    bool Clear();
+    
+    // Synchronous Read Operations
+    bool GetEntryOrDefault(TId? id, out IEntry<TId, TValue> entry);
+    bool GetNextOrDefault(TId? id, out IEntry<TId, TValue> entry);
+    bool GetFirstOrDefault(out IEntry<TId, TValue> entry);
+    bool GetFirstIdOrDefault(out TId? id);
+    bool GetLastOrDefault(out IEntry<TId, TValue> entry);
+    bool GetLastIdOrDefault(out TId? id);
+    
+    // Asynchronous Operations
+    Task<IEntry<TId, TValue>> GetNextAsync(TId? id = null, CancellationToken ct = default);
+    Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken ct = default);
+}
+```
+</details>
+
+<details>
 <summary><strong>IEntry&lt;TValue&gt;</strong> (click to expand)</summary>
 
 ```csharp
@@ -283,13 +326,42 @@ using Microsoft.Extensions.Logging;
 
 var config = new Configuration { EvictAfterEveryX = 100 };
 using var loggerFactory = LoggerFactory.Create(builder => { });
-var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), loggerFactory);
-var l1Store = new Store<string>(100, 1000, loggerFactory); // Min: 100, Max: 1000
-var l2Store = new Store<string>(loggerFactory);            // Unbounded
+var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+var metadata = new Metadata<Guid>(config, loggerFactory);
+var l1Store = new Store<Guid, string>(100, 1000, _ => null, loggerFactory); // Min: 100, Max: 1000, no ID gen
+var l2Store = new Store<Guid, string>(null, null, lastId => 
+{
+    if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+    return identityGenerator.GetNext();
+}, loggerFactory); // Unbounded, generates GuidV7 IDs
 
-using var cache = new OrderedCache<string>(
+using var cache = new OrderedCache<Guid, string>(
     config, l1Store, l2Store, metadata, loggerFactory
 );
+```
+
+### Custom ID Types
+
+To use custom identifier types, create Store instances with custom ID generation logic:
+
+```csharp
+using Baubit.Caching;
+using Baubit.Caching.InMemory;
+using Microsoft.Extensions.Logging;
+
+// Usage with integer IDs
+var config = new Configuration { EvictAfterEveryX = 100 };
+using var loggerFactory = LoggerFactory.Create(builder => { });
+var metadata = new Metadata<int>(config, loggerFactory);
+var l1Store = new Store<int, string>(100, 1000, _ => null, loggerFactory); // No ID gen
+var l2Store = new Store<int, string>(null, null, lastId => lastId.HasValue ? lastId.Value + 1 : 1, loggerFactory); // Sequential IDs
+
+using var cache = new OrderedCache<int, string>(
+    config, l1Store, l2Store, metadata, loggerFactory
+);
+
+cache.Add("value", out var entry);
+Console.WriteLine(entry.Id);  // e.g., 1, 2, 3...
 ```
 
 ### Write Operations
@@ -430,8 +502,31 @@ Entries are evicted based on active enumerator positions:
 var config = new Configuration { EvictAfterEveryX = 100 };
 ```
 
-- Every 100 `Add` operations, evicts entries **before** the slowest active enumerator
+**Behavior:**
+- Every `EvictAfterEveryX` `Add` operations triggers eviction logic
+- **With active enumerators**: Evicts entries **before** the slowest active enumerator's current position
+- **Without active enumerators**: Evicts **all entries** up to and including the tail
 - Prevents unbounded memory growth when consumers lag behind producers
+- Enumerators that are not properly disposed will pin memory indefinitely
+
+**Important**: Always dispose enumerators when done (use `using` statements or cancel `CancellationToken`) to allow eviction to proceed. Abandoned enumerators prevent memory cleanup.
+
+**Example - Multiple Consumer Speeds:**
+```csharp
+// Fast consumer at entry 100, slow consumer at entry 10
+// Eviction will only remove entries before entry 10
+// This ensures all active consumers can still read their data
+```
+
+**Example - No Active Consumers:**
+```csharp
+// Cache with no active enumerators
+cache.Add("item-1", out _);
+// ... add 99 more items ...
+cache.Add("item-100", out _); // Triggers eviction at threshold
+// All 100 entries evicted since no consumers are reading
+Assert.Equal(0, cache.Count);
+```
 
 **Configuration Options:**
 ```csharp
@@ -512,9 +607,11 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 ### Q: Can slow enumerators cause memory leaks?
 
 **A:** Yes. Enumerators that are not disposed will pin memory indefinitely, preventing eviction of entries they haven't processed. Always:
-- Use `using` with enumerators
+- Use `using` with enumerators or ensure `DisposeAsync()` is called
 - Cancel `CancellationToken` when consumers shut down
 - Set appropriate `EvictAfterEveryX` to limit growth
+
+**Note**: With no active enumerators, the cache automatically evicts all entries at the eviction threshold. This means if you're using the cache without enumerators (e.g., only `Add`/`Get`/`Remove` operations), entries will be cleared periodically unless you disable eviction by setting `EvictAfterEveryX` to a very high value (e.g., `int.MaxValue`).
 
 ### Q: Is it safe to remove entries during iteration?
 

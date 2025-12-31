@@ -1,5 +1,4 @@
-﻿using Baubit.Identity;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -8,55 +7,58 @@ using System.Threading.Tasks;
 namespace Baubit.Caching.InMemory
 {
     /// <summary>
-    /// In-memory implementation of <see cref="IMetadata"/> for tracking cache entry ordering and identifiers.
-    /// Thread-safe for concurrent access.
+    /// In-memory implementation of <see cref="IMetadata{TId}"/> for tracking cache entry ordering with generic identifiers.
+    /// Uses a linked list for O(1) head/tail access and a dictionary for O(1) lookups.
+    /// Thread-safe when used with external synchronization.
     /// </summary>
-    public class Metadata : IMetadata
+    /// <typeparam name="TId">The type of the entry identifier. Must be a struct implementing IComparable&lt;TId&gt; and IEquatable&lt;TId&gt;.</typeparam>
+    public class Metadata<TId> : IMetadata<TId> where TId : struct, IComparable<TId>, IEquatable<TId>
     {
         /// <summary>
         /// Gets the linked list representing the current order of entry identifiers.
         /// </summary>
-        protected LinkedList<Guid> CurrentOrder { get; private set; } = new LinkedList<Guid>();
+        protected LinkedList<TId> CurrentOrder { get; private set; } = new LinkedList<TId>();
         /// <summary>
         /// Gets the mapping from entry identifiers to their linked list nodes.
         /// </summary>
-        protected Dictionary<Guid, LinkedListNode<Guid>> IdNodeMap { get; private set; } = new Dictionary<Guid, LinkedListNode<Guid>>();
+        protected Dictionary<TId, LinkedListNode<TId>> IdNodeMap { get; private set; } = new Dictionary<TId, LinkedListNode<TId>>();
 
         /// <inheritdoc/>
         public long Count { get => IdNodeMap.Count; }
 
         /// <inheritdoc/>
-        public Guid? HeadId { get => CurrentOrder?.First?.Value; }
+        public TId? HeadId { get => CurrentOrder?.First?.Value; }
         /// <inheritdoc/>
-        public Guid? TailId { get => CurrentOrder?.Last?.Value; }
+        public TId? TailId { get => CurrentOrder?.Last?.Value; }
 
         /// <summary>
         /// Gets the runtime configuration for this cache instance.
         /// </summary>
         protected Configuration Configuration { get; private set; }
 
+        /// <summary>
+        /// Tracks the number of waiting room creations since the last reset, used for adaptive resizing.
+        /// </summary>
         private long roomCount;
 
-        // Coordinates awaiters for the next id produced.
-        private WaitingRoom<Guid> waitingRoom = new WaitingRoom<Guid>();
-
-        protected readonly IIdentityGenerator identityGenerator;
-        private bool disposedValue;
-        private ILogger<Metadata> logger;
-
         /// <summary>
-        /// Initializes a new instance of the <see cref="Metadata"/> class.
+        /// Coordinates awaiters for the next id produced.
+        /// </summary>
+        private WaitingRoom<TId> waitingRoom = new WaitingRoom<TId>();
+
+        private bool disposedValue;
+
+        private ILogger<Metadata<TId>> logger;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Metadata{TId}"/> class.
         /// </summary>
         /// <param name="configuration">The cache configuration.</param>
-        /// <param name="identityGenerator">The identity generator for producing new entry IDs.</param>
         /// <param name="loggerFactory">The logger factory for diagnostics.</param>
-        public Metadata(Configuration configuration, 
-                        IIdentityGenerator identityGenerator, 
+        public Metadata(Configuration configuration,
                         ILoggerFactory loggerFactory)
         {
-            logger = loggerFactory.CreateLogger<Metadata>();
+            logger = loggerFactory.CreateLogger<Metadata<TId>>();
             this.Configuration = configuration;
-            this.identityGenerator = identityGenerator;
         }
 
         /// <inheritdoc/>
@@ -66,7 +68,7 @@ namespace Baubit.Caching.InMemory
         }
 
         /// <inheritdoc/>
-        public bool AddTail(Guid id)
+        public bool AddTail(TId id)
         {
             IdNodeMap.Add(id, CurrentOrder.AddLast(id));
             return SignalAwaiters(id);
@@ -77,20 +79,20 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         /// <param name="id">The new ID to signal.</param>
         /// <returns><c>true</c> if signaled; otherwise <c>false</c>.</returns>
-        private bool SignalAwaiters(Guid id)
+        private bool SignalAwaiters(TId id)
         {
             if (!waitingRoom.HasGuests) return true;
             if (Configuration?.RunAdaptiveResizing == true) Interlocked.Increment(ref roomCount);
             var prevRoom = waitingRoom;
-            waitingRoom = new WaitingRoom<Guid>();
+            waitingRoom = new WaitingRoom<TId>();
             return prevRoom.TrySetResult(id);
         }
 
         /// <inheritdoc/>
-        public bool ContainsKey(Guid id) => IdNodeMap.ContainsKey(id);
+        public bool ContainsKey(TId id) => IdNodeMap.ContainsKey(id);
 
         /// <inheritdoc/>
-        public bool GetNextId(Guid? id, out Guid? nextId)
+        public bool GetNextId(TId? id, out TId? nextId)
         {
             if (id == null) nextId = HeadId;
             else if (HeadId == null) nextId = null; // if id is not null but HeadId is null means id is the tail that was deleted just before the call arrived here. Return null so the caller can get the next arriving item
@@ -108,9 +110,9 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         /// <param name="id">The ID to compare against.</param>
         /// <returns>The next greater ID if found; otherwise <c>null</c>.</returns>
-        private Guid? FindNextGreaterId(Guid id)
+        private TId? FindNextGreaterId(TId id)
         {
-            Guid? result = null;
+            TId? result = null;
             foreach (var key in IdNodeMap.Keys)
             {
                 if (key.CompareTo(id) > 0)
@@ -125,7 +127,7 @@ namespace Baubit.Caching.InMemory
         }
 
         /// <inheritdoc/>
-        public Task<Guid> GetNextIdAsync(Guid? id, CancellationToken cancellationToken)
+        public Task<TId> GetNextIdAsync(TId? id, CancellationToken cancellationToken)
         {
             if (!GetNextId(id, out var nextId))
             {
@@ -139,23 +141,12 @@ namespace Baubit.Caching.InMemory
         }
 
         /// <inheritdoc/>
-        public bool GenerateNextId(out Guid nextId)
-        {
-            if (TailId.HasValue)
-            {
-                identityGenerator.InitializeFrom(TailId.Value);
-            }
-            nextId = identityGenerator.GetNext();
-            return true;
-        }
-
-        /// <inheritdoc/>
-        public bool GetIdsThrough(Guid id, out IEnumerable<Guid> ids)
+        public bool GetIdsThrough(TId id, out IEnumerable<TId> ids)
         {
             // (Empty store || if id preceeds the head) = do nothing
             if (CurrentOrder.Count == 0 || (HeadId.HasValue && id.CompareTo(HeadId.Value) < 0))
             {
-                ids = Array.Empty<Guid>();
+                ids = Array.Empty<TId>();
                 return false;
             }
 
@@ -170,7 +161,7 @@ namespace Baubit.Caching.InMemory
             {
                 // this method is intended to be called from the ordered cache and it is assumed that the cache will ALWAYS send an id that IS present in the IdNodeMap.
                 // if this block ever gets executed, the above assumption must not longer be true.
-                ids = Array.Empty<Guid>();
+                ids = Array.Empty<TId>();
                 return false;
             }
 
@@ -184,9 +175,9 @@ namespace Baubit.Caching.InMemory
         /// <param name="start">The starting node.</param>
         /// <param name="endInclusive">The ending node (inclusive).</param>
         /// <returns>A list of GUIDs from start to endInclusive.</returns>
-        private static List<Guid> EnumerateToList(LinkedListNode<Guid> start, LinkedListNode<Guid> endInclusive)
+        private static List<TId> EnumerateToList(LinkedListNode<TId> start, LinkedListNode<TId> endInclusive)
         {
-            var result = new List<Guid>();
+            var result = new List<TId>();
             for (var n = start; n != null; n = n.Next)
             {
                 result.Add(n.Value);
@@ -200,17 +191,17 @@ namespace Baubit.Caching.InMemory
         /// </summary>
         /// <param name="id">The ID to check.</param>
         /// <returns><c>true</c> if smaller; otherwise <c>false</c>.</returns>
-        private bool IsIdSmallerThanHeadId(Guid? id) => id.HasValue && HeadId.HasValue && id.Value.CompareTo(HeadId.Value) < 0;
+        private bool IsIdSmallerThanHeadId(TId? id) => id.HasValue && HeadId.HasValue && id.Value.CompareTo(HeadId.Value) < 0;
 
         /// <summary>
         /// Determines if the given ID is the tail ID.
         /// </summary>
         /// <param name="id">The ID to check.</param>
         /// <returns><c>true</c> if it is the tail; otherwise <c>false</c>.</returns>
-        private bool IsIdTailId(Guid? id) => id.HasValue && TailId.HasValue && id == TailId;
+        private bool IsIdTailId(TId? id) => id.HasValue && TailId.HasValue && id.Value.CompareTo(TailId.Value) == 0;
 
         /// <inheritdoc/>
-        public bool Remove(Guid id)
+        public bool Remove(TId id)
         {
             if (IdNodeMap.TryGetValue(id, out var node))
             {
@@ -222,7 +213,7 @@ namespace Baubit.Caching.InMemory
         }
 
         /// <summary>
-        /// Releases the resources used by the <see cref="Metadata"/> class.
+        /// Releases the resources used by the <see cref="Metadata{TId}"/> class.
         /// </summary>
         /// <param name="disposing">Whether called from Dispose().</param>
         protected virtual void Dispose(bool disposing)

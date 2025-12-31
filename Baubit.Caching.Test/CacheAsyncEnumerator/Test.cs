@@ -1,6 +1,7 @@
 ﻿using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System;
 
 namespace Baubit.Caching.Test.CacheAsyncEnumerator
 {
@@ -11,12 +12,17 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
     {
         private readonly ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
 
-        private Caching.OrderedCache<string> CreateTestCache()
+        private OrderedCache<Guid, string> CreateTestCache()
         {
             var config = new Caching.Configuration();
-            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
-            return new Caching.OrderedCache<string>(config, null, l2Store, metadata, _loggerFactory);
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => 
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+            return new OrderedCache<Guid, string>(config, null, l2Store, metadata, _loggerFactory);
         }
 
         [Fact]
@@ -29,7 +35,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             cache.Add("third", out _);
 
             // Act
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             await using var enumerator = cache.GetAsyncEnumerator();
 
             for (int i = 0; i < 3; i++)
@@ -72,7 +78,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             cache.Add("test", out var added);
 
             // Act
-            var enumerator = (Caching.CacheAsyncEnumerator<string>)cache.GetAsyncEnumerator();
+            var enumerator = (Caching.CacheAsyncEnumerator<Guid, string>)cache.GetAsyncEnumerator();
             await enumerator.MoveNextAsync();
             var currentId = enumerator.CurrentId;
 

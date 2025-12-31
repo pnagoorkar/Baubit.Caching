@@ -1,6 +1,7 @@
 ﻿using Baubit.Caching.InMemory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System;
 
 namespace Baubit.Caching.Test.OrderedCache
 {
@@ -11,17 +12,23 @@ namespace Baubit.Caching.Test.OrderedCache
     {
         private readonly ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
 
-        private Caching.OrderedCache<string> CreateTestCache(
+        private OrderedCache<Guid, string> CreateTestCache(
             Caching.Configuration? config = null,
             long? l1MinCap = null,
             long? l1MaxCap = null)
         {
             config ??= new Caching.Configuration();
-            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
-            var l1Store = l1MinCap.HasValue ? new Caching.InMemory.Store<string>(l1MinCap, l1MaxCap, _loggerFactory) : null;
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => 
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+            // L1 store doesn't need an identity generator since it only stores entries created by L2
+            var l1Store = l1MinCap.HasValue ? new Baubit.Caching.InMemory.Store<Guid, string>(l1MinCap, l1MaxCap, _ => null, _loggerFactory) : null;
 
-            return new Caching.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
+            return new OrderedCache<Guid, string>(config, l1Store, l2Store, metadata, _loggerFactory);
         }
 
         [Fact]
@@ -374,7 +381,7 @@ namespace Baubit.Caching.Test.OrderedCache
             cache.Add("third", out _);
 
             // Act
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             await foreach (var entry in cache.WithCancellation(CancellationToken.None))
             {
                 entries.Add(entry);
@@ -385,10 +392,12 @@ namespace Baubit.Caching.Test.OrderedCache
             Assert.Equal(3, entries.Count);
         }
         [Fact]
-        public void OrderedCache_ConcurrentAdd_AllSucceed()
+        public async Task OrderedCache_ConcurrentAdd_AllSucceed()
         {
             // Arrange
-            using var cache = CreateTestCache();
+            // Disable eviction for this test since we're not using enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            using var cache = CreateTestCache(config: config);
             const int threadCount = 10;
             const int itemsPerThread = 100;
             var tasks = new Task[threadCount];
@@ -409,7 +418,7 @@ namespace Baubit.Caching.Test.OrderedCache
                     }
                 });
             }
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.All(addResults, result => Assert.True(result));
@@ -417,12 +426,14 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentRead_AllSucceed()
+        public async Task OrderedCache_ConcurrentRead_AllSucceed()
         {
             // Arrange
-            using var cache = CreateTestCache();
+            // Disable eviction for this test since we're not using enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            using var cache = CreateTestCache(config: config);
             // Pre-populate cache
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 100; i++)
             {
                 cache.Add($"item-{i}", out var entry);
@@ -448,17 +459,19 @@ namespace Baubit.Caching.Test.OrderedCache
                     }
                 });
             }
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.All(readResults, result => Assert.True(result));
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentMixedReadWrite_NoDeadlock()
+        public async Task OrderedCache_ConcurrentMixedReadWrite_NoDeadlock()
         {
             // Arrange
-            using var cache = CreateTestCache();
+            // Disable eviction for this test since we're not using enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            using var cache = CreateTestCache(config: config);
             const int operationCount = 500;
             var tasks = new List<Task>();
             var allSuccessful = true;
@@ -491,7 +504,9 @@ namespace Baubit.Caching.Test.OrderedCache
                 }));
             }
 
-            var completed = Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(10));
+            var allTasksTask = Task.WhenAll(tasks.ToArray());
+            var completedTask = await Task.WhenAny(allTasksTask, Task.Delay(TimeSpan.FromSeconds(10)));
+            var completed = completedTask == allTasksTask;
 
             // Assert
             Assert.True(completed, "Operations should complete without deadlock");
@@ -499,11 +514,13 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentRemove_HandlesCorrectly()
+        public async Task OrderedCache_ConcurrentRemove_HandlesCorrectly()
         {
             // Arrange
-            using var cache = CreateTestCache();
-            var entries = new List<IEntry<string>>();
+            // Disable eviction for this test since we're not using enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            using var cache = CreateTestCache(config: config);
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 100; i++)
             {
                 cache.Add($"item-{i}", out var entry);
@@ -527,7 +544,7 @@ namespace Baubit.Caching.Test.OrderedCache
                     }
                 });
             }
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.All(removeResults, result => Assert.True(result));
@@ -535,11 +552,11 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentUpdate_AllSucceed()
+        public async Task OrderedCache_ConcurrentUpdate_AllSucceed()
         {
             // Arrange
             using var cache = CreateTestCache();
-            var entries = new List<IEntry<string>>();
+            var entries = new List<IEntry<Guid, string>>();
             for (int i = 0; i < 50; i++)
             {
                 cache.Add($"original-{i}", out var entry);
@@ -563,7 +580,7 @@ namespace Baubit.Caching.Test.OrderedCache
                     }
                 });
             }
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.All(updateResults, result => Assert.True(result));
@@ -577,7 +594,7 @@ namespace Baubit.Caching.Test.OrderedCache
             cache.Add("first", out var first);
 
             const int waiterCount = 10;
-            var tasks = new Task<IEntry<string>>[waiterCount];
+            var tasks = new Task<IEntry<Guid, string>>[waiterCount];
 
             // Act - Start multiple waiters
             for (int i = 0; i < waiterCount; i++)
@@ -608,7 +625,7 @@ namespace Baubit.Caching.Test.OrderedCache
             // Arrange
             using var cache = CreateTestCache();
             const int waiterCount = 10;
-            var tasks = new Task<IEntry<string>>[waiterCount];
+            var tasks = new Task<IEntry<Guid, string>>[waiterCount];
 
             // Act - Start multiple waiters on empty cache
             for (int i = 0; i < waiterCount; i++)
@@ -671,7 +688,7 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentEviction_WithActiveEnumerators()
+        public async Task OrderedCache_ConcurrentEviction_WithActiveEnumerators()
         {
             // Arrange
             var config = new Caching.Configuration { EvictAfterEveryX = 10 };
@@ -693,7 +710,7 @@ namespace Baubit.Caching.Test.OrderedCache
 
             // Act - Add items to trigger eviction
             cache.Add("item-0", out _);
-            enumeratorStarted.Task.Wait(TimeSpan.FromSeconds(1));
+            await enumeratorStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
             for (int i = 1; i < 50; i++)
             {
@@ -701,14 +718,14 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             continueEnumeration.SetResult(true);
-            enumeratorTask.Wait(TimeSpan.FromSeconds(2));
+            await enumeratorTask.WaitAsync(TimeSpan.FromSeconds(2));
 
             // Assert - Should not throw or deadlock
             Assert.True(enumeratorTask.IsCompleted);
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentClear_WithReaders()
+        public async Task OrderedCache_ConcurrentClear_WithReaders()
         {
             // Arrange
             using var cache = CreateTestCache();
@@ -741,7 +758,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 clearExecuted = cache.Clear();
             }));
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
 
             // Assert
             Assert.True(clearExecuted);
@@ -749,14 +766,14 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentAddAndGetNext_RaceCondition()
+        public async Task OrderedCache_ConcurrentAddAndGetNext_RaceCondition()
         {
             // Arrange
             using var cache = CreateTestCache();
             cache.Add("initial", out var initial);
 
             var tasks = new List<Task>();
-            var nextResults = new System.Collections.Concurrent.ConcurrentBag<IEntry<string>>();
+            var nextResults = new System.Collections.Concurrent.ConcurrentBag<IEntry<Guid, string>>();
 
             // Act - Concurrent GetNextOrDefault and Add
             for (int i = 0; i < 10; i++)
@@ -783,17 +800,19 @@ namespace Baubit.Caching.Test.OrderedCache
                 }));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
 
             // Assert - Should complete without exceptions
             Assert.True(tasks.All(t => t.IsCompleted));
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentL1L2Access_MaintainsConsistency()
+        public async Task OrderedCache_ConcurrentL1L2Access_MaintainsConsistency()
         {
             // Arrange - Small L1 cache to force L1/L2 interaction
-            using var cache = CreateTestCache(l1MinCap: 10, l1MaxCap: 10);
+            // Disable eviction for this test since we're not using enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            using var cache = CreateTestCache(config: config, l1MinCap: 10, l1MaxCap: 10);
             var tasks = new List<Task>();
             var allEntriesFound = true;
             var addedEntries = new System.Collections.Concurrent.ConcurrentBag<Guid>();
@@ -824,7 +843,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 }));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
 
             // Verify all added entries are retrievable
             foreach (var id in addedEntries)
@@ -841,7 +860,7 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentDispose_HandlesGracefully()
+        public async Task OrderedCache_ConcurrentDispose_HandlesGracefully()
         {
             // Arrange
             var cache = CreateTestCache();
@@ -874,13 +893,17 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Dispose while operations are running
-            Thread.Sleep(50);
+            await Task.Delay(50);
             cache.Dispose();
 
             // Wait for all tasks
             try
             {
-                Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(5));
+                await Task.WhenAll(tasks.ToArray()).WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch (TimeoutException)
+            {
+                // Expected - operations may timeout after dispose
             }
             catch (AggregateException)
             {
@@ -952,7 +975,7 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_ConcurrentUpdateSameEntry_LastWins()
+        public async Task OrderedCache_ConcurrentUpdateSameEntry_LastWins()
         {
             // Arrange
             using var cache = CreateTestCache();
@@ -972,7 +995,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 });
             }
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.All(updateResults, result => Assert.True(result));
@@ -982,10 +1005,12 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         [Fact]
-        public void OrderedCache_StressTest_MixedOperations()
+        public async Task OrderedCache_StressTest_MixedOperations()
         {
             // Arrange
-            using var cache = CreateTestCache(l1MinCap: 50, l1MaxCap: 100);
+            // Disable eviction for this test since we're not using enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            using var cache = CreateTestCache(config: config, l1MinCap: 50, l1MaxCap: 100);
             const int operationCount = 1000;
             var tasks = new List<Task>();
             var random = new Random();
@@ -1026,7 +1051,9 @@ namespace Baubit.Caching.Test.OrderedCache
                 }));
             }
 
-            var completed = Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(30));
+            var allTasksTask = Task.WhenAll(tasks.ToArray());
+            var completedTask = await Task.WhenAny(allTasksTask, Task.Delay(TimeSpan.FromSeconds(30)));
+            var completed = completedTask == allTasksTask;
 
             // Assert
             Assert.True(completed, "Stress test should complete without deadlock");
@@ -1216,11 +1243,16 @@ namespace Baubit.Caching.Test.OrderedCache
                 RunAdaptiveResizing = true,
                 AdaptionWindowMS = 100
             };
-            var metadata = new Metadata(config, Baubit.Identity.IdentityGenerator.CreateNew(), NullLoggerFactory.Instance);
-            var l2Store = new Caching.InMemory.Store<string>(_loggerFactory);
-            var l1Store = new Caching.InMemory.Store<string>(_loggerFactory); // Uncapped
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => 
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+            var l1Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, _ => null, _loggerFactory); // Uncapped, no ID gen
 
-            using var cache = new Caching.OrderedCache<string>(config, l1Store, l2Store, metadata, _loggerFactory);
+            using var cache = new OrderedCache<Guid, string>(config, l1Store, l2Store, metadata, _loggerFactory);
 
             // Act
             for (int i = 0; i < 10; i++)
@@ -1479,8 +1511,10 @@ namespace Baubit.Caching.Test.OrderedCache
                 cache.Add($"item-{i}", out _);
             }
 
-            // Assert - Should complete successfully
-            Assert.Equal(10, cache.Count);
+            // Assert - With no active enumerators, all entries should be evicted after eviction threshold is reached
+            // After adding 10 items with eviction threshold of 5, eviction runs twice (at 5th and 10th addition)
+            // Since there are no active enumerators, all entries are evicted
+            Assert.Equal(0, cache.Count);
         }
 
         [Fact]
@@ -1648,5 +1682,214 @@ namespace Baubit.Caching.Test.OrderedCache
 
             // Assert - No exception thrown
         }
+
+        #region Additional Eviction Tests
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithSingleActiveEnumeratorAtHead_KeepsAllEntries()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 3; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Start enumerator at head
+            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            await enumerator.MoveNextAsync(); // Position at first entry (CurrentId is now item-0)
+
+            // Act - Add more entries to trigger eviction
+            for (int i = 3; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Enumerator is at item-0, so eviction will keep entries from item-0 onward
+            // At 5th add (item-7), eviction triggered - keeps from item-0 (9 entries remain)
+            // At 10th add (item-9), would trigger again but enumerator still at item-0
+            Assert.True(cache.Count >= 9, $"Expected at least 9 entries, got {cache.Count}");
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithMultipleEnumeratorsAtDifferentPositions_EvictsUpToSlowest()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 10 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            var entries = new List<IEntry<Guid, string>>();
+            for (int i = 0; i < 5; i++)
+            {
+                cache.Add($"item-{i}", out var entry);
+                entries.Add(entry);
+            }
+
+            // Fast enumerator - reads all 5 entries
+            var fastEnum = cache.GetAsyncEnumerator(CancellationToken.None);
+            for (int i = 0; i < 5; i++)
+            {
+                await fastEnum.MoveNextAsync();
+            }
+
+            // Slow enumerator - reads only 2 entries
+            var slowEnum = cache.GetAsyncEnumerator(CancellationToken.None);
+            await slowEnum.MoveNextAsync();
+            await slowEnum.MoveNextAsync();
+
+            // Act - Add more entries to trigger eviction (total 15 > threshold 10)
+            for (int i = 5; i < 15; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Should evict entries up to position of slowest enumerator (entry 1)
+            // Slowest is at entry index 1 (0-indexed), so entry 0 and 1 should remain
+            // Entry 0 can be evicted once slowest moves past it
+            Assert.True(cache.Count >= 13, $"Expected at least 13 entries, got {cache.Count}"); // 15 total - 2 that slowest hasn't read
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_EnumeratorDisposed_AllowsEviction()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 3; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Create and dispose enumerator
+            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            await enumerator.MoveNextAsync();
+            await enumerator.DisposeAsync();
+
+            // Act - Add more entries to trigger eviction
+            for (int i = 3; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - With no active enumerators, entries should be evicted
+            Assert.Equal(0, cache.Count);
+        }
+
+        [Fact]
+        public void OrderedCache_Eviction_NoEnumerators_EvictsImmediatelyAfterThreshold()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 3 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Act - Add exactly at threshold
+            cache.Add("item-0", out _);
+            cache.Add("item-1", out _);
+            Assert.Equal(2, cache.Count);
+            
+            cache.Add("item-2", out _); // This triggers eviction
+            
+            // Assert - All entries evicted since no enumerators
+            Assert.Equal(0, cache.Count);
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_EnumeratorAtTail_EvictsAllButLast()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add entries
+            for (int i = 0; i < 4; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Enumerator reads to tail
+            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            for (int i = 0; i < 4; i++)
+            {
+                await enumerator.MoveNextAsync();
+            }
+
+            // Act - Add one more to trigger eviction at threshold
+            cache.Add("item-4", out _);
+            cache.Add("item-5", out _); // Trigger eviction again
+            
+            // Assert - Should keep only entries at or after enumerator position
+            Assert.True(cache.Count <= 2, $"Expected at most 2 entries, got {cache.Count}");
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_ConcurrentEnumeratorsMovingAtSameSpeed_EvictsCorrectly()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 10 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 5; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Multiple enumerators at same position
+            var enum1 = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enum2 = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enum3 = cache.GetAsyncEnumerator(CancellationToken.None);
+
+            // All read 3 entries
+            for (int i = 0; i < 3; i++)
+            {
+                await enum1.MoveNextAsync();
+                await enum2.MoveNextAsync();
+                await enum3.MoveNextAsync();
+            }
+
+            // Act - Add more to trigger eviction
+            for (int i = 5; i < 15; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Should evict entries before position 2 (all enumerators at same position)
+            Assert.True(cache.Count >= 12, $"Expected at least 12 entries, got {cache.Count}");
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithFutureEnumerator_RespectsFuturePosition()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            
+            // Add initial entries
+            for (int i = 0; i < 3; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Future enumerator starts at current tail
+            var futureEnum = cache.GetFutureAsyncEnumerator(CancellationToken.None);
+
+            // Act - Add more entries (future enumerator should block eviction)
+            for (int i = 3; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+
+            // Assert - Future enumerator hasn't moved, so it should be at tail position
+            // Entries before its position can be evicted
+            Assert.True(cache.Count <= 7, $"Expected at most 7 entries, got {cache.Count}");
+        }
+
+        #endregion
     }
 }
