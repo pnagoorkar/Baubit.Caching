@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -454,6 +455,44 @@ namespace Baubit.Caching
             return retVal;
         }
 
+        /// <inheritdoc/>
+        public async IAsyncEnumerable<(TId, T)> EnumerateAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
+        {
+            var enumerator = GetAsyncEnumerator(cancellationToken);
+            while (await enumerator.MoveNextAsync())
+            {
+                if (enumerator.Current.Value is T value)
+                {
+                    yield return (enumerator.Current.Id, value);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
+        {
+            var enumerator = GetFutureAsyncEnumerator(cancellationToken);
+            while (await enumerator.MoveNextAsync())
+            {
+                if (enumerator.Current.Value is T value)
+                {
+                    yield return (enumerator.Current.Id, value);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> OnNextAsync<T>(Func<(TId, T), object, Task<bool>> handler, 
+                                               object state, 
+                                               CancellationToken cancellationToken = default) where T : TValue
+        {
+            await foreach (var tuple in EnumerateFutureAsync<T>(cancellationToken))
+            {
+                await handler?.Invoke(tuple, state);
+            }
+            return true;
+        }
+
         /// <summary>
         /// Releases managed and unmanaged resources.
         /// </summary>
@@ -485,6 +524,5 @@ namespace Baubit.Caching
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
-
     }
 }

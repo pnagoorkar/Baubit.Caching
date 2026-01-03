@@ -1,7 +1,5 @@
-﻿using Baubit.Caching.InMemory;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using System;
 
 namespace Baubit.Caching.Test.OrderedCache
 {
@@ -1888,6 +1886,601 @@ namespace Baubit.Caching.Test.OrderedCache
             // Assert - Future enumerator hasn't moved, so it should be at tail position
             // Entries before its position can be evicted
             Assert.True(cache.Count <= 7, $"Expected at most 7 entries, got {cache.Count}");
+        }
+
+        #endregion
+
+        #region EnumerateAsync Tests
+
+        [Fact]
+        public async Task EnumerateAsync_EmptyCache_ReturnsNoEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var results = new List<(Guid, string)>();
+            var cts = new CancellationTokenSource(100); // Timeout to prevent hanging
+
+            // Act
+            try
+            {
+                await foreach (var tuple in cache.EnumerateAsync<string>(cts.Token))
+                {
+                    results.Add(tuple);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when cache is empty and we timeout
+            }
+
+            // Assert
+            Assert.Empty(results);
+        }
+
+        [Fact]
+        public async Task EnumerateAsync_WithMatchingType_ReturnsAllEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("first", out var entry1);
+            cache.Add("second", out var entry2);
+            cache.Add("third", out var entry3);
+            var results = new List<(Guid, string)>();
+
+            // Act
+            await foreach (var tuple in cache.EnumerateAsync<string>())
+            {
+                results.Add(tuple);
+                if (results.Count >= 3) break; // Stop after getting all entries
+            }
+
+            // Assert
+            Assert.Equal(3, results.Count);
+            Assert.Equal(entry1.Id, results[0].Item1);
+            Assert.Equal("first", results[0].Item2);
+            Assert.Equal(entry2.Id, results[1].Item1);
+            Assert.Equal("second", results[1].Item2);
+            Assert.Equal(entry3.Id, results[2].Item1);
+            Assert.Equal("third", results[2].Item2);
+        }
+
+        [Fact]
+        public async Task EnumerateAsync_WithCancellation_StopsEnumeration()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            for (int i = 0; i < 10; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+            var cts = new CancellationTokenSource();
+            var results = new List<(Guid, string)>();
+
+            // Act
+            var enumTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await foreach (var tuple in cache.EnumerateAsync<string>(cts.Token))
+                    {
+                        results.Add(tuple);
+                        if (results.Count >= 5)
+                        {
+                            cts.Cancel(); // Cancel after reading 5 entries
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await enumTask;
+
+            // Assert - Should have stopped at or shortly after 5 entries
+            Assert.True(results.Count >= 5 && results.Count <= 10, $"Expected 5-10 results, got {results.Count}");
+        }
+
+        [Fact]
+        public async Task EnumerateAsync_MaintainsOrderOfEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var expectedOrder = new List<Guid>();
+            for (int i = 0; i < 10; i++)
+            {
+                cache.Add($"value-{i}", out var entry);
+                expectedOrder.Add(entry.Id);
+            }
+            var results = new List<Guid>();
+
+            // Act
+            await foreach (var tuple in cache.EnumerateAsync<string>())
+            {
+                results.Add(tuple.Item1);
+                if (results.Count >= 10) break;
+            }
+
+            // Assert
+            Assert.Equal(expectedOrder, results);
+        }
+
+        [Fact]
+        public async Task EnumerateAsync_WithL1AndL2Stores_EnumeratesAllEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache(l1MinCap: 5, l1MaxCap: 10);
+            for (int i = 0; i < 20; i++)
+            {
+                cache.Add($"item-{i}", out _);
+            }
+            var results = new List<(Guid, string)>();
+
+            // Act
+            await foreach (var tuple in cache.EnumerateAsync<string>())
+            {
+                results.Add(tuple);
+                if (results.Count >= 20) break;
+            }
+
+            // Assert
+            Assert.Equal(20, results.Count);
+        }
+
+        [Fact]
+        public async Task EnumerateAsync_WaitsForNewEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("initial-1", out _);
+            cache.Add("initial-2", out _);
+            var results = new List<(Guid, string)>();
+            var cts = new CancellationTokenSource();
+
+            // Act
+            var enumTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await foreach (var tuple in cache.EnumerateAsync<string>(cts.Token))
+                    {
+                        results.Add(tuple);
+                        if (results.Count >= 5)
+                        {
+                            break; // Stop after reading 5 entries
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Not expected in this test but handle it
+                }
+            });
+
+            // Wait for enumerator to start and read initial entries
+            await Task.Delay(100);
+            
+            // Add more entries while enumeration is waiting
+            cache.Add("future-1", out _);
+            cache.Add("future-2", out _);
+            cache.Add("future-3", out _);
+
+            await enumTask;
+
+            // Assert - Should have read both initial and future entries
+            Assert.Equal(5, results.Count);
+            Assert.Equal("initial-1", results[0].Item2);
+            Assert.Equal("initial-2", results[1].Item2);
+            Assert.Equal("future-1", results[2].Item2);
+            Assert.Equal("future-2", results[3].Item2);
+            Assert.Equal("future-3", results[4].Item2);
+        }
+
+        #endregion
+
+        #region EnumerateFutureAsync Tests
+
+        [Fact]
+        public async Task EnumerateFutureAsync_WaitsForNewEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("initial", out _);
+            var results = new List<(Guid, string)>();
+
+            // Act
+            var enumTask = Task.Run(async () =>
+            {
+                await foreach (var tuple in cache.EnumerateFutureAsync<string>())
+                {
+                    results.Add(tuple);
+                    if (results.Count >= 3)
+                    {
+                        break; // Stop after getting 3 entries
+                    }
+                }
+            });
+
+            // Add entries after enumeration starts
+            await Task.Delay(50);
+            cache.Add("future-1", out var entry1);
+            cache.Add("future-2", out var entry2);
+            cache.Add("future-3", out var entry3);
+
+            // Wait for enumeration to complete
+            await enumTask;
+
+            // Assert
+            Assert.Equal(3, results.Count);
+            Assert.Equal(entry1.Id, results[0].Item1);
+            Assert.Equal("future-1", results[0].Item2);
+            Assert.Equal(entry2.Id, results[1].Item1);
+            Assert.Equal("future-2", results[1].Item2);
+            Assert.Equal(entry3.Id, results[2].Item1);
+            Assert.Equal("future-3", results[2].Item2);
+        }
+
+        [Fact]
+        public async Task EnumerateFutureAsync_IgnoresExistingEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("existing-1", out _);
+            cache.Add("existing-2", out _);
+            cache.Add("existing-3", out _);
+            var results = new List<(Guid, string)>();
+
+            // Act
+            var enumTask = Task.Run(async () =>
+            {
+                await foreach (var tuple in cache.EnumerateFutureAsync<string>())
+                {
+                    results.Add(tuple);
+                    if (results.Count >= 2)
+                    {
+                        break; // Stop after getting 2 entries
+                    }
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("future-1", out var entry1);
+            cache.Add("future-2", out var entry2);
+
+            await enumTask;
+
+            // Assert - Should only contain future entries, not existing ones
+            Assert.Equal(2, results.Count);
+            Assert.Equal(entry1.Id, results[0].Item1);
+            Assert.Equal(entry2.Id, results[1].Item1);
+        }
+
+        [Fact]
+        public async Task EnumerateFutureAsync_WithCancellation_StopsWaiting()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var cts = new CancellationTokenSource(100);
+            var reached = false;
+
+            // Act
+            try
+            {
+                await foreach (var tuple in cache.EnumerateFutureAsync<string>(cts.Token))
+                {
+                    // Should not reach here since no entries will be added
+                    reached = true;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+
+            // Assert
+            Assert.False(reached, "Should not have enumerated any entries");
+        }
+
+        [Fact]
+        public async Task EnumerateFutureAsync_MultipleEnumerators_AllReceiveNewEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var results1 = new List<(Guid, string)>();
+            var results2 = new List<(Guid, string)>();
+
+            // Act
+            var enum1Task = Task.Run(async () =>
+            {
+                await foreach (var tuple in cache.EnumerateFutureAsync<string>())
+                {
+                    results1.Add(tuple);
+                    if (results1.Count >= 2) break;
+                }
+            });
+
+            var enum2Task = Task.Run(async () =>
+            {
+                await foreach (var tuple in cache.EnumerateFutureAsync<string>())
+                {
+                    results2.Add(tuple);
+                    if (results2.Count >= 2) break;
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("shared-1", out var entry1);
+            cache.Add("shared-2", out var entry2);
+
+            await Task.WhenAll(enum1Task, enum2Task);
+
+            // Assert - Both enumerators should see the same entries
+            Assert.Equal(2, results1.Count);
+            Assert.Equal(2, results2.Count);
+            Assert.Equal(entry1.Id, results1[0].Item1);
+            Assert.Equal(entry1.Id, results2[0].Item1);
+            Assert.Equal(entry2.Id, results1[1].Item1);
+            Assert.Equal(entry2.Id, results2[1].Item1);
+        }
+
+        #endregion
+
+        #region OnNextAsync Tests
+
+        [Fact]
+        public async Task OnNextAsync_ProcessesNewEntriesWithHandler()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var processedEntries = new List<(Guid, string)>();
+            var cts = new CancellationTokenSource();
+            var processedCount = 0;
+
+            // Act
+            var handlerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await cache.OnNextAsync<string>(
+                        async (tuple, state) =>
+                        {
+                            var list = state as List<(Guid, string)>;
+                            list?.Add(tuple);
+                            processedCount++;
+                            if (processedCount >= 3)
+                            {
+                                cts.Cancel();
+                            }
+                            return await Task.FromResult(true);
+                        },
+                        processedEntries,
+                        cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("entry-1", out var entry1);
+            cache.Add("entry-2", out var entry2);
+            cache.Add("entry-3", out var entry3);
+
+            await handlerTask;
+
+            // Assert
+            Assert.Equal(3, processedEntries.Count);
+            Assert.Equal(entry1.Id, processedEntries[0].Item1);
+            Assert.Equal("entry-1", processedEntries[0].Item2);
+            Assert.Equal(entry2.Id, processedEntries[1].Item1);
+            Assert.Equal("entry-2", processedEntries[1].Item2);
+            Assert.Equal(entry3.Id, processedEntries[2].Item1);
+            Assert.Equal("entry-3", processedEntries[2].Item2);
+        }
+
+        [Fact]
+        public async Task OnNextAsync_PassesStateToHandler()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var counter = 0;
+            var cts = new CancellationTokenSource();
+            var stateObject = new { MaxCount = 2 };
+
+            // Act
+            var handlerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await cache.OnNextAsync<string>(
+                        async (tuple, state) =>
+                        {
+                            counter++;
+                            var s = state as dynamic;
+                            if (counter >= s.MaxCount)
+                            {
+                                cts.Cancel();
+                            }
+                            return await Task.FromResult(true);
+                        },
+                        stateObject,
+                        cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("entry-1", out _);
+            cache.Add("entry-2", out _);
+
+            await handlerTask;
+
+            // Assert
+            Assert.Equal(2, counter);
+        }
+
+        [Fact]
+        public async Task OnNextAsync_WithNullHandler_DoesNotThrow()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var cts = new CancellationTokenSource(100);
+
+            // Act - Should not throw, just complete when cancelled
+            try
+            {
+                await cache.OnNextAsync<string>(null, null, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+
+            // No assertion needed - test passes if no exception other than OperationCanceledException
+        }
+
+        [Fact]
+        public async Task OnNextAsync_WithCancellation_StopsProcessing()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var processedCount = 0;
+            var cts = new CancellationTokenSource();
+
+            // Act
+            var handlerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await cache.OnNextAsync<string>(
+                        async (tuple, state) =>
+                        {
+                            processedCount++;
+                            return await Task.FromResult(true);
+                        },
+                        null,
+                        cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("entry-1", out _);
+            await Task.Delay(50);
+            cts.Cancel();
+            cache.Add("entry-2", out _);
+
+            await handlerTask;
+
+            // Assert - Should have processed only entry-1, not entry-2
+            Assert.Equal(1, processedCount);
+        }
+
+        [Fact]
+        public async Task OnNextAsync_IgnoresExistingEntries()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("existing-1", out _);
+            cache.Add("existing-2", out _);
+            var processedEntries = new List<string>();
+            var cts = new CancellationTokenSource();
+            var processedCount = 0;
+
+            // Act
+            var handlerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await cache.OnNextAsync<string>(
+                        async (tuple, state) =>
+                        {
+                            var list = state as List<string>;
+                            list?.Add(tuple.Item2);
+                            processedCount++;
+                            if (processedCount >= 2)
+                            {
+                                cts.Cancel();
+                            }
+                            return await Task.FromResult(true);
+                        },
+                        processedEntries,
+                        cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("future-1", out _);
+            cache.Add("future-2", out _);
+
+            await handlerTask;
+
+            // Assert - Should only process future entries
+            Assert.Equal(2, processedEntries.Count);
+            Assert.Equal("future-1", processedEntries[0]);
+            Assert.Equal("future-2", processedEntries[1]);
+        }
+
+        [Fact]
+        public async Task OnNextAsync_HandlerCanProcessAsynchronously()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var processedEntries = new List<(Guid, string, DateTime)>();
+            var cts = new CancellationTokenSource();
+            var processedCount = 0;
+
+            // Act
+            var handlerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await cache.OnNextAsync<string>(
+                        async (tuple, state) =>
+                        {
+                            var list = state as List<(Guid, string, DateTime)>;
+                            await Task.Delay(10); // Simulate async work
+                            list?.Add((tuple.Item1, tuple.Item2, DateTime.UtcNow));
+                            processedCount++;
+                            if (processedCount >= 3)
+                            {
+                                cts.Cancel();
+                            }
+                            return await Task.FromResult(true);
+                        },
+                        processedEntries,
+                        cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("async-1", out _);
+            cache.Add("async-2", out _);
+            cache.Add("async-3", out _);
+
+            await handlerTask;
+
+            // Assert
+            Assert.Equal(3, processedEntries.Count);
+            Assert.Equal("async-1", processedEntries[0].Item2);
+            Assert.Equal("async-2", processedEntries[1].Item2);
+            Assert.Equal("async-3", processedEntries[2].Item2);
         }
 
         #endregion
