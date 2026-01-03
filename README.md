@@ -267,6 +267,11 @@ public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValu
     // Asynchronous Operations
     Task<IEntry<TId, TValue>> GetNextAsync(TId? id = null, CancellationToken cancellationToken = default);
     Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken cancellationToken = default);
+    
+    // Typed Enumeration Operations
+    IAsyncEnumerable<(TId, T)> EnumerateAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
+    IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
+    Task<bool> OnNextAsync<T>(Func<(TId, T), object, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
 }
 ```
 </details>
@@ -382,3 +387,85 @@ public class Configuration : Baubit.Configuration.Configuration
 }
 ```
 </details>
+
+## Typed Enumeration Methods
+
+The cache provides three convenience methods for working with specific value types without manual casting:
+
+### EnumerateAsync<T>
+
+Enumerates existing and future cache entries, filtering by type `T`:
+
+```csharp
+var cache = new OrderedCache<Guid, object>(/* ... */);
+
+cache.Add("text-entry", out _);
+cache.Add(42, out _);
+cache.Add("another-text", out _);
+
+// Only enumerate string entries
+await foreach (var (id, value) in cache.EnumerateAsync<string>())
+{
+    Console.WriteLine($"{id}: {value}");
+    // Output:
+    // <guid1>: text-entry
+    // <guid3>: another-text
+}
+```
+
+Waits for new entries after reaching the tail. Use `break` or cancellation to stop.
+
+### EnumerateFutureAsync<T>
+
+Enumerates only future entries (added after enumeration starts), filtering by type `T`:
+
+```csharp
+var cache = new OrderedCache<Guid, object>(/* ... */);
+
+cache.Add("existing-1", out _);
+cache.Add("existing-2", out _);
+
+// Start enumeration - ignores existing entries
+var enumTask = Task.Run(async () =>
+{
+    await foreach (var (id, value) in cache.EnumerateFutureAsync<string>())
+    {
+        Console.WriteLine($"New: {value}");
+    }
+});
+
+await Task.Delay(100);
+cache.Add("future-1", out _);  // Output: New: future-1
+cache.Add("future-2", out _);  // Output: New: future-2
+```
+
+### OnNextAsync<T>
+
+Processes future entries with a handler function, filtering by type `T`:
+
+```csharp
+var cache = new OrderedCache<Guid, string>(/* ... */);
+var cts = new CancellationTokenSource();
+
+// Start processing future entries
+var processingTask = cache.OnNextAsync<string>(
+    handler: async (tuple, state) =>
+    {
+        var (id, value) = tuple;
+        Console.WriteLine($"Processing: {value}");
+        await Task.Delay(10); // Simulate async work
+        return true;
+    },
+    state: null,
+    cancellationToken: cts.Token);
+
+// Add entries that will be processed
+cache.Add("task-1", out _);
+cache.Add("task-2", out _);
+
+// Stop processing
+cts.Cancel();
+await processingTask;
+```
+
+**Note**: All three methods filter entries by type using pattern matching. Only entries where `entry.Value is T` will be yielded/processed.

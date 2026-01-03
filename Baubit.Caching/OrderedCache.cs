@@ -455,30 +455,33 @@ namespace Baubit.Caching
             return retVal;
         }
 
+        /// <inheritdoc/>
         public async IAsyncEnumerable<(TId, T)> EnumerateAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
         {
             var enumerator = GetAsyncEnumerator(cancellationToken);
             while (await enumerator.MoveNextAsync())
             {
-                if (enumerator.Current is T value)
+                if (enumerator.Current.Value is T value)
                 {
                     yield return (enumerator.Current.Id, value);
                 }
             }
         }
 
+        /// <inheritdoc/>
         public async IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
         {
             var enumerator = GetFutureAsyncEnumerator(cancellationToken);
             while (await enumerator.MoveNextAsync())
             {
-                if (enumerator.Current is T value)
+                if (enumerator.Current.Value is T value)
                 {
                     yield return (enumerator.Current.Id, value);
                 }
             }
         }
 
+        /// <inheritdoc/>
         public async Task<bool> OnNextAsync<T>(Func<(TId, T), object, Task<bool>> handler, 
                                                object state, 
                                                CancellationToken cancellationToken = default) where T : TValue
