@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -89,6 +90,12 @@ namespace Baubit.Caching
         /// <param name="cancellationToken">A token to cancel the wait.</param>
         /// <returns>A task that completes with the next entry added after this method is called.</returns>
         Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken cancellationToken = default);
+
+        IAsyncEnumerable<(TId, T)> EnumerateAsync<T>(CancellationToken cancellationToken = default) where T: TValue;
+
+        IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
+
+        Task<bool> OnNextAsync<T>(Func<(TId, T), object, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
 
         /// <summary>
         /// Removes the entry with the specified identifier.
