@@ -111,13 +111,14 @@ namespace Baubit.Caching
         /// <summary>
         /// Asynchronously processes future cache entries with a handler function, starting from the current tail.
         /// This method waits for new entries to be added and invokes the handler for each entry of type <typeparamref name="T"/>.
+        /// The handler receives the cancellation token to support cooperative cancellation within the processing logic.
         /// </summary>
         /// <typeparam name="T">The specific type of values to process. Must be assignable from <typeparamref name="TValue"/>.</typeparam>
-        /// <param name="handler">A function that processes each entry tuple and returns whether to continue processing.</param>
+        /// <param name="handler">A function that processes each entry tuple, receives state and cancellation token, and returns whether to continue processing.</param>
         /// <param name="state">State object passed to the handler function.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A task that completes with <c>true</c> when processing finishes normally.</returns>
-        Task<bool> OnNextAsync<T>(Func<(TId, T), object, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
+        Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
 
         /// <summary>
         /// Removes the entry with the specified identifier.

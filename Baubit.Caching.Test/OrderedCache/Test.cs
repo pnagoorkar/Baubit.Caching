@@ -2043,14 +2043,14 @@ namespace Baubit.Caching.Test.OrderedCache
             {
                 try
                 {
-                    await foreach (var tuple in cache.EnumerateAsync<string>(cts.Token))
+                await foreach (var tuple in cache.EnumerateAsync<string>(cts.Token))
+                {
+                    results.Add(tuple);
+                    if (results.Count >= 5)
                     {
-                        results.Add(tuple);
-                        if (results.Count >= 5)
-                        {
-                            break; // Stop after reading 5 entries
-                        }
+                        break; // Stop after reading 5 entries
                     }
+                }
                 }
                 catch (OperationCanceledException)
                 {
@@ -2243,7 +2243,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 try
                 {
                     await cache.OnNextAsync<string>(
-                        async (tuple, state) =>
+                        async (tuple, state, ct) =>
                         {
                             var list = state as List<(Guid, string)>;
                             list?.Add(tuple);
@@ -2295,7 +2295,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 try
                 {
                     await cache.OnNextAsync<string>(
-                        async (tuple, state) =>
+                        async (tuple, state, ct) =>
                         {
                             counter++;
                             var s = state as dynamic;
@@ -2358,7 +2358,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 try
                 {
                     await cache.OnNextAsync<string>(
-                        async (tuple, state) =>
+                        async (tuple, state, ct) =>
                         {
                             processedCount++;
                             return await Task.FromResult(true);
@@ -2401,7 +2401,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 try
                 {
                     await cache.OnNextAsync<string>(
-                        async (tuple, state) =>
+                        async (tuple, state, ct) =>
                         {
                             var list = state as List<string>;
                             list?.Add(tuple.Item2);
@@ -2448,10 +2448,10 @@ namespace Baubit.Caching.Test.OrderedCache
                 try
                 {
                     await cache.OnNextAsync<string>(
-                        async (tuple, state) =>
+                        async (tuple, state, ct) =>
                         {
                             var list = state as List<(Guid, string, DateTime)>;
-                            await Task.Delay(10); // Simulate async work
+                            await Task.Delay(10, ct); // Simulate async work with cancellation support
                             list?.Add((tuple.Item1, tuple.Item2, DateTime.UtcNow));
                             processedCount++;
                             if (processedCount >= 3)
@@ -2481,6 +2481,47 @@ namespace Baubit.Caching.Test.OrderedCache
             Assert.Equal("async-1", processedEntries[0].Item2);
             Assert.Equal("async-2", processedEntries[1].Item2);
             Assert.Equal("async-3", processedEntries[2].Item2);
+        }
+
+        [Fact]
+        public async Task OnNextAsync_CancellationTokenPropagatedToHandler()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var handlerReceivedToken = false;
+            var cts = new CancellationTokenSource();
+
+            // Act
+            var handlerTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await cache.OnNextAsync<string>(
+                        async (tuple, state, ct) =>
+                        {
+                            handlerReceivedToken = ct.CanBeCanceled;
+                            if (ct.CanBeCanceled)
+                            {
+                                cts.Cancel();
+                            }
+                            return await Task.FromResult(true);
+                        },
+                        null,
+                        cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add("test-entry", out _);
+
+            await handlerTask;
+
+            // Assert
+            Assert.True(handlerReceivedToken);
         }
 
         #endregion

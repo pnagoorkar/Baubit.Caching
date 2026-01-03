@@ -271,7 +271,7 @@ public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValu
     // Typed Enumeration Operations
     IAsyncEnumerable<(TId, T)> EnumerateAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
     IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
-    Task<bool> OnNextAsync<T>(Func<(TId, T), object, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
+    Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
 }
 ```
 </details>
