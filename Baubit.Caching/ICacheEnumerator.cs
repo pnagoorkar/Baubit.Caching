@@ -13,8 +13,8 @@ namespace Baubit.Caching
         TId? CurrentId { get; }
 
         /// <summary>
-        /// Gets the name of this enumerator.
+        /// Gets the identifier of this enumerator.
         /// </summary>
-        string Name { get; }
+        string Id { get; }
     }
 }

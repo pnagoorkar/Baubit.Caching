@@ -98,7 +98,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var cts = new CancellationTokenSource();
 
             // Act
-            await using var enumerator = cache.GetAsyncEnumerator(cts.Token);
+            await using var enumerator = cache.GetAsyncEnumerator(null, cts.Token);
             await enumerator.MoveNextAsync();
             cts.Cancel();
             var moveResult = await enumerator.MoveNextAsync();
@@ -115,7 +115,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var cts = new CancellationTokenSource(200);
 
             // Act
-            await using var enumerator = cache.GetAsyncEnumerator(cts.Token);
+            await using var enumerator = cache.GetAsyncEnumerator(null, cts.Token);
 
             // Should wait since cache is empty
             var moveTask = enumerator.MoveNextAsync();
@@ -144,25 +144,24 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
         }
 
         [Fact]
-        public void CacheAsyncEnumerator_Name_WithProvidedName_ReturnsProvidedName()
+        public void CacheAsyncEnumerator_Id_WithProvidedId_ReturnsProvidedId()
         {
             // Arrange
             using var cache = CreateTestCache();
-            var expectedName = "TestEnumerator123";
+            var expectedId = "TestEnumerator123";
 
             // Act
             var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(
                 cache, 
                 null, 
-                default, 
-                expectedName);
+                expectedId);
 
             // Assert
-            Assert.Equal(expectedName, enumerator.Name);
+            Assert.Equal(expectedId, enumerator.Id);
         }
 
         [Fact]
-        public void CacheAsyncEnumerator_Name_WithoutProvidedName_ReturnsGuid()
+        public void CacheAsyncEnumerator_Id_WithoutProvidedId_ReturnsGuid()
         {
             // Arrange
             using var cache = CreateTestCache();
@@ -170,19 +169,17 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             // Act
             var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(
                 cache, 
-                null, 
-                default, 
                 null);
 
             // Assert
-            Assert.NotNull(enumerator.Name);
-            Assert.NotEmpty(enumerator.Name);
+            Assert.NotNull(enumerator.Id);
+            Assert.NotEmpty(enumerator.Id);
             // Verify it's a valid GUID string
-            Assert.True(Guid.TryParse(enumerator.Name, out _));
+            Assert.True(Guid.TryParse(enumerator.Id, out _));
         }
 
         [Fact]
-        public void CacheAsyncEnumerator_Name_WithEmptyString_ReturnsEmptyString()
+        public void CacheAsyncEnumerator_Id_WithEmptyString_ReturnsEmptyString()
         {
             // Arrange
             using var cache = CreateTestCache();
@@ -191,30 +188,29 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(
                 cache, 
                 null, 
-                default, 
                 "");
 
             // Assert
-            // Empty string is treated as a provided name (not null), so it should be returned as-is
-            Assert.Equal("", enumerator.Name);
+            // Empty string is treated as a provided id (not null), so it should be returned as-is
+            Assert.Equal("", enumerator.Id);
         }
 
         [Fact]
-        public void CacheAsyncEnumerator_Name_ThroughCache_WithProvidedName_ReturnsProvidedName()
+        public void CacheAsyncEnumerator_Id_ThroughCache_WithProvidedId_ReturnsProvidedId()
         {
             // Arrange
             using var cache = CreateTestCache();
-            var expectedName = "CacheLevelEnumerator";
+            var expectedId = "CacheLevelEnumerator";
 
             // Act
-            var enumerator = (Caching.CacheAsyncEnumerator<Guid, string>)cache.GetAsyncEnumerator(expectedName);
+            var enumerator = (Caching.CacheAsyncEnumerator<Guid, string>)cache.GetAsyncEnumerator(expectedId);
 
             // Assert
-            Assert.Equal(expectedName, enumerator.Name);
+            Assert.Equal(expectedId, enumerator.Id);
         }
 
         [Fact]
-        public void CacheAsyncEnumerator_Name_ThroughCache_WithoutProvidedName_ReturnsGuid()
+        public void CacheAsyncEnumerator_Id_ThroughCache_WithoutProvidedId_ReturnsGuid()
         {
             // Arrange
             using var cache = CreateTestCache();
@@ -223,10 +219,10 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var enumerator = (Caching.CacheAsyncEnumerator<Guid, string>)cache.GetAsyncEnumerator();
 
             // Assert
-            Assert.NotNull(enumerator.Name);
-            Assert.NotEmpty(enumerator.Name);
+            Assert.NotNull(enumerator.Id);
+            Assert.NotEmpty(enumerator.Id);
             // Verify it's a valid GUID string
-            Assert.True(Guid.TryParse(enumerator.Name, out _));
+            Assert.True(Guid.TryParse(enumerator.Id, out _));
         }
     }
 }
