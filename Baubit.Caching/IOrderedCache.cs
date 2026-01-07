@@ -14,6 +14,14 @@ namespace Baubit.Caching
         long Count { get; }
 
         /// <summary>
+        /// Gets a named asynchronous enumerator that iterates through cache entries from the current head.
+        /// </summary>
+        /// <param name="name">The name of the enumerator. If not provided, a new GUID will be generated.</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
+        /// <returns>An asynchronous enumerator for the cache entries.</returns>
+        IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumerator(string name, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Adds a new value to the tail of the cache.
         /// </summary>
         /// <param name="value">The value to add.</param>

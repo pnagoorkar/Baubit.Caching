@@ -16,18 +16,20 @@ namespace Baubit.Caching
         public IAsyncEnumerator<IEntry<TId, TValue>> CreateEnumerator(
             IOrderedCache<TId, TValue> cache,
             Action<ICacheEnumerator<TId>> onDispose,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string name = null)
         {
-            return new CacheAsyncEnumerator<TId, TValue>(cache, onDispose, cancellationToken);
+            return new CacheAsyncEnumerator<TId, TValue>(cache, onDispose, cancellationToken, name);
         }
 
         /// <inheritdoc/>
         public IAsyncEnumerator<IEntry<TId, TValue>> CreateFutureEnumerator(
             IOrderedCache<TId, TValue> cache,
             Action<ICacheEnumerator<TId>> onDispose,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string name = null)
         {
-            return new CacheFutureAsyncEnumerator<TId, TValue>(cache, onDispose, cancellationToken);
+            return new CacheFutureAsyncEnumerator<TId, TValue>(cache, onDispose, cancellationToken, name);
         }
     }
 }

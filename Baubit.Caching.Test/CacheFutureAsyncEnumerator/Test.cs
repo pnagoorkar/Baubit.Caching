@@ -162,5 +162,91 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
 
             // Assert - No exception thrown
         }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Name_WithProvidedName_ReturnsProvidedName()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var expectedName = "FutureEnumerator456";
+
+            // Act
+            var enumerator = new CacheFutureAsyncEnumerator<Guid, string>(
+                cache, 
+                null, 
+                default, 
+                expectedName);
+
+            // Assert
+            Assert.Equal(expectedName, enumerator.Name);
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Name_WithoutProvidedName_ReturnsGuid()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+
+            // Act
+            var enumerator = new CacheFutureAsyncEnumerator<Guid, string>(
+                cache, 
+                null, 
+                default, 
+                null);
+
+            // Assert
+            Assert.NotNull(enumerator.Name);
+            Assert.NotEmpty(enumerator.Name);
+            // Verify it's a valid GUID string
+            Assert.True(Guid.TryParse(enumerator.Name, out _));
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Name_WithEmptyString_ReturnsEmptyString()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+
+            // Act
+            var enumerator = new CacheFutureAsyncEnumerator<Guid, string>(
+                cache, 
+                null, 
+                default, 
+                "");
+
+            // Assert
+            // Empty string should be treated as provided name (not null), so it should be returned as-is
+            Assert.Equal("", enumerator.Name);
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Name_ThroughCache_WithProvidedName_ReturnsProvidedName()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var expectedName = "FutureCacheLevelEnumerator";
+
+            // Act
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator(expectedName);
+
+            // Assert
+            Assert.Equal(expectedName, enumerator.Name);
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Name_ThroughCache_WithoutProvidedName_ReturnsGuid()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+
+            // Act
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
+
+            // Assert
+            Assert.NotNull(enumerator.Name);
+            Assert.NotEmpty(enumerator.Name);
+            // Verify it's a valid GUID string
+            Assert.True(Guid.TryParse(enumerator.Name, out _));
+        }
     }
 }
