@@ -182,7 +182,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
         }
 
         [Fact]
-        public void CacheAsyncEnumerator_Name_WithEmptyString_ReturnsGuid()
+        public void CacheAsyncEnumerator_Name_WithEmptyString_ReturnsEmptyString()
         {
             // Arrange
             using var cache = CreateTestCache();
@@ -195,7 +195,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
                 "");
 
             // Assert
-            // Empty string should be treated as provided name (not null), so it should be returned as-is
+            // Empty string is treated as a provided name (not null), so it should be returned as-is
             Assert.Equal("", enumerator.Name);
         }
 
