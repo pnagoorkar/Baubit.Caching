@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -398,7 +399,7 @@ namespace Baubit.Caching
             while (l1Store?.HasCapacity == true &&
                    metadata.GetNextId(l1Store.LastAddedId, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
-                   nextEntry != null && l1Store.Add(nextEntry));
+                   nextEntry != null && l1Store.Add(nextEntry)) ;
             return true;
         }
 
@@ -453,6 +454,7 @@ namespace Baubit.Caching
 
         private IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumeratorInternal(string id, CancellationToken cancellationToken)
         {
+            if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
             var retVal = enumeratorFactory.CreateEnumerator(this, e => activeEnumerators.Remove(e), id, cancellationToken);
             activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
             return retVal;
@@ -467,6 +469,7 @@ namespace Baubit.Caching
         /// <returns>An asynchronous enumerator for future cache entries.</returns>
         public IAsyncEnumerator<IEntry<TId, TValue>> GetFutureAsyncEnumerator(string id = null, CancellationToken cancellationToken = default)
         {
+            if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
             var retVal = enumeratorFactory.CreateFutureEnumerator(this, e => activeEnumerators.Remove(e), id, cancellationToken);
             activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
             return retVal;
@@ -499,8 +502,8 @@ namespace Baubit.Caching
         }
 
         /// <inheritdoc/>
-        public async Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler, 
-                                               object state, 
+        public async Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler,
+                                               object state,
                                                CancellationToken cancellationToken = default) where T : TValue
         {
             await foreach (var tuple in EnumerateFutureAsync<T>(cancellationToken))
