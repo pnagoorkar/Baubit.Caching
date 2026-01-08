@@ -437,7 +437,7 @@ namespace Baubit.Caching
         /// <returns>An asynchronous enumerator for the cache entries.</returns>
         IAsyncEnumerator<IEntry<TId, TValue>> IAsyncEnumerable<IEntry<TId, TValue>>.GetAsyncEnumerator(CancellationToken cancellationToken)
         {
-            return GetAsyncEnumerator(null, cancellationToken);
+            return GetAsyncEnumeratorInternal(null, cancellationToken);
         }
 
         /// <summary>
@@ -447,6 +447,11 @@ namespace Baubit.Caching
         /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
         /// <returns>An asynchronous enumerator for the cache entries.</returns>
         public IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumerator(string id = null, CancellationToken cancellationToken = default)
+        {
+            return GetAsyncEnumeratorInternal(id, cancellationToken);
+        }
+
+        private IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumeratorInternal(string id, CancellationToken cancellationToken)
         {
             var retVal = enumeratorFactory.CreateEnumerator(this, e => activeEnumerators.Remove(e), id, cancellationToken);
             activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
