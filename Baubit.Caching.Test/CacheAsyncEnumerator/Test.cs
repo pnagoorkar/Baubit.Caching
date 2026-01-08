@@ -224,5 +224,38 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             // Verify it's a valid GUID string
             Assert.True(Guid.TryParse(enumerator.Id, out _));
         }
+
+        [Fact]
+        public void CacheAsyncEnumerator_DuplicateId_ThrowsInvalidOperationException()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var duplicateId = "duplicate-enumerator";
+
+            // Act - Create first enumerator with the id
+            var enumerator1 = cache.GetAsyncEnumerator(duplicateId);
+
+            // Assert - Attempting to create second enumerator with same id throws
+            var exception = Assert.Throws<InvalidOperationException>(() => 
+                cache.GetAsyncEnumerator(duplicateId));
+            Assert.Contains(duplicateId, exception.Message);
+        }
+
+        [Fact]
+        public async Task CacheAsyncEnumerator_DuplicateId_AfterDispose_AllowsReuse()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var reuseId = "reusable-enumerator";
+
+            // Act - Create, use, and dispose first enumerator
+            var enumerator1 = cache.GetAsyncEnumerator(reuseId);
+            await enumerator1.DisposeAsync();
+
+            // Assert - Can create new enumerator with same id after disposal
+            var enumerator2 = cache.GetAsyncEnumerator(reuseId);
+            Assert.Equal(reuseId, ((ICacheEnumerator<Guid>)enumerator2).Id);
+            await enumerator2.DisposeAsync();
+        }
     }
 }
