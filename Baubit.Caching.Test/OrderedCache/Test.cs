@@ -930,7 +930,7 @@ namespace Baubit.Caching.Test.OrderedCache
                     int count = 0;
                     try
                     {
-                        var enumerator = cache.GetFutureAsyncEnumerator(cts.Token);
+                        var enumerator = cache.GetFutureAsyncEnumerator(null, cts.Token);
                         await using (enumerator)
                         {
                             while (await enumerator.MoveNextAsync())
@@ -1077,7 +1077,7 @@ namespace Baubit.Caching.Test.OrderedCache
             {
                 try
                 {
-                    var enumerator = cache.GetFutureAsyncEnumerator(cts.Token);
+                    var enumerator = cache.GetFutureAsyncEnumerator(null, cts.Token);
                     await using (enumerator)
                     {
                         int count = 0;
@@ -1308,7 +1308,7 @@ namespace Baubit.Caching.Test.OrderedCache
                 {
                     try
                     {
-                        var enumerator = cache.GetFutureAsyncEnumerator(cts.Token);
+                        var enumerator = cache.GetFutureAsyncEnumerator(null, cts.Token);
                         await using (enumerator)
                         {
                             int count = 0;
@@ -1697,7 +1697,7 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Start enumerator at head
-            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enumerator = cache.GetAsyncEnumerator(null, CancellationToken.None);
             await enumerator.MoveNextAsync(); // Position at first entry (CurrentId is now item-0)
 
             // Act - Add more entries to trigger eviction
@@ -1728,14 +1728,14 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Fast enumerator - reads all 5 entries
-            var fastEnum = cache.GetAsyncEnumerator(CancellationToken.None);
+            var fastEnum = cache.GetAsyncEnumerator(null, CancellationToken.None);
             for (int i = 0; i < 5; i++)
             {
                 await fastEnum.MoveNextAsync();
             }
 
             // Slow enumerator - reads only 2 entries
-            var slowEnum = cache.GetAsyncEnumerator(CancellationToken.None);
+            var slowEnum = cache.GetAsyncEnumerator(null, CancellationToken.None);
             await slowEnum.MoveNextAsync();
             await slowEnum.MoveNextAsync();
 
@@ -1765,7 +1765,7 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Create and dispose enumerator
-            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enumerator = cache.GetAsyncEnumerator(null, CancellationToken.None);
             await enumerator.MoveNextAsync();
             await enumerator.DisposeAsync();
 
@@ -1811,7 +1811,7 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Enumerator reads to tail
-            var enumerator = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enumerator = cache.GetAsyncEnumerator(null, CancellationToken.None);
             for (int i = 0; i < 4; i++)
             {
                 await enumerator.MoveNextAsync();
@@ -1839,9 +1839,9 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Multiple enumerators at same position
-            var enum1 = cache.GetAsyncEnumerator(CancellationToken.None);
-            var enum2 = cache.GetAsyncEnumerator(CancellationToken.None);
-            var enum3 = cache.GetAsyncEnumerator(CancellationToken.None);
+            var enum1 = cache.GetAsyncEnumerator(null, CancellationToken.None);
+            var enum2 = cache.GetAsyncEnumerator(null, CancellationToken.None);
+            var enum3 = cache.GetAsyncEnumerator(null, CancellationToken.None);
 
             // All read 3 entries
             for (int i = 0; i < 3; i++)
@@ -1875,7 +1875,7 @@ namespace Baubit.Caching.Test.OrderedCache
             }
 
             // Future enumerator starts at current tail
-            var futureEnum = cache.GetFutureAsyncEnumerator(CancellationToken.None);
+            var futureEnum = cache.GetFutureAsyncEnumerator(null, CancellationToken.None);
 
             // Act - Add more entries (future enumerator should block eviction)
             for (int i = 3; i < 10; i++)

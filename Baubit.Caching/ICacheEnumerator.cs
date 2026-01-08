@@ -11,5 +11,10 @@ namespace Baubit.Caching
         /// Gets the identifier of the current entry in the enumeration, or <c>null</c> if not positioned.
         /// </summary>
         TId? CurrentId { get; }
+
+        /// <summary>
+        /// Gets the identifier of this enumerator.
+        /// </summary>
+        string Id { get; }
     }
 }
