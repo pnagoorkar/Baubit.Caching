@@ -21,6 +21,11 @@ namespace Baubit.Caching
         /// </summary>
         public TId? CurrentId => Current?.Id;
 
+        /// <summary>
+        /// Gets the identifier of this enumerator.
+        /// </summary>
+        public string Id { get; }
+
         protected readonly IOrderedCache<TId, TValue> cache;
         private Action<ICacheEnumerator<TId>> onDispose;
         private CancellationToken cancellationToken;
@@ -30,14 +35,17 @@ namespace Baubit.Caching
         /// </summary>
         /// <param name="cache">The cache to enumerate.</param>
         /// <param name="onDispose">Callback invoked when the enumerator is disposed.</param>
+        /// <param name="id">The identifier of the enumerator. If not provided, a new GUID will be generated.</param>
         /// <param name="cancellationToken">A token to cancel the enumeration.</param>
         public BaseCacheAsyncEnumerator(IOrderedCache<TId, TValue> cache,
                                     Action<ICacheEnumerator<TId>> onDispose,
+                                    string id = null,
                                     CancellationToken cancellationToken = default)
         {
             this.cache = cache;
             this.onDispose = onDispose;
             this.cancellationToken = cancellationToken;
+            this.Id = id ?? Guid.NewGuid().ToString();
             cancellationTokenRegistration = this.cancellationToken.Register(() => DisposeAsync());
         }
         /// <summary>

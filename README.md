@@ -411,6 +411,12 @@ while (await enumerator.MoveNextAsync())
     Console.WriteLine($"New: {enumerator.Current.Value}");
 }
 
+// Named enumerators for tracking and deduplication
+var consumer1 = cache.GetAsyncEnumerator("consumer-1");
+var consumer2 = cache.GetFutureAsyncEnumerator("consumer-2");
+// Duplicate id throws InvalidOperationException
+// var duplicate = cache.GetAsyncEnumerator("consumer-1"); // throws!
+
 // Wait for next entry after current position
 var next = await cache.GetNextAsync(currentId, cancellationToken);
 
@@ -629,6 +635,20 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 **A:** 
 - `GetNextAsync(id)`: Waits for the next entry after `id`. Returns immediately if it exists, blocks otherwise.
 - `GetFutureAsyncEnumerator()`: Returns an `IAsyncEnumerable` starting from the current tail, yielding all future entries as they're added.
+
+### Q: What are enumerator IDs and when should I use them?
+
+**A:** Each enumerator has a unique `Id` property (auto-generated GUID by default). You can provide custom ids:
+```csharp
+var enumerator = cache.GetAsyncEnumerator("my-consumer");
+```
+
+**Benefits:**
+- Prevents duplicate enumerators (throws `InvalidOperationException` if id already active)
+- Enables tracking which consumer is processing which entries
+- Useful for debugging and monitoring multiple consumers
+
+**Note:** Enumerator ids are only unique while the enumerator is active. After disposal, the id can be reused.
 
 ## Benchmarks
 
