@@ -2525,5 +2525,460 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         #endregion
+
+        #region Thread Safety Tests for Enumerator Management
+
+        [Fact]
+        public async Task OrderedCache_GetAsyncEnumerator_ConcurrentWithSameId_ThrowsInvalidOperationException()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var enumeratorId = "test-enum-id";
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+            var successCount = 0;
+
+            // Act - Try to create multiple enumerators with same ID concurrently
+            var tasks = new List<Task>();
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetAsyncEnumerator(enumeratorId, CancellationToken.None);
+                        Interlocked.Increment(ref successCount);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - Only one should succeed, the rest should throw
+            Assert.Equal(1, successCount);
+            Assert.Equal(9, exceptions.Count);
+            Assert.All(exceptions, ex => Assert.IsType<InvalidOperationException>(ex));
+        }
+
+        [Fact]
+        public async Task OrderedCache_GetFutureAsyncEnumerator_ConcurrentWithSameId_ThrowsInvalidOperationException()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var enumeratorId = "test-future-enum-id";
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+            var successCount = 0;
+
+            // Act - Try to create multiple future enumerators with same ID concurrently
+            var tasks = new List<Task>();
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetFutureAsyncEnumerator(enumeratorId, CancellationToken.None);
+                        Interlocked.Increment(ref successCount);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - Only one should succeed, the rest should throw
+            Assert.Equal(1, successCount);
+            Assert.Equal(9, exceptions.Count);
+            Assert.All(exceptions, ex => Assert.IsType<InvalidOperationException>(ex));
+        }
+
+        [Fact]
+        public async Task OrderedCache_GetAsyncEnumerator_ConcurrentWithDifferentIds_AllSucceed()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var successCount = 0;
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+
+            // Act - Create multiple enumerators with different IDs concurrently
+            var tasks = new List<Task>();
+            for (int i = 0; i < 20; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetAsyncEnumerator($"enum-{taskId}", CancellationToken.None);
+                        Interlocked.Increment(ref successCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - All should succeed
+            Assert.Equal(20, successCount);
+            Assert.Empty(exceptions);
+        }
+
+        [Fact]
+        public async Task OrderedCache_GetFutureAsyncEnumerator_ConcurrentWithDifferentIds_AllSucceed()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var successCount = 0;
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+
+            // Act - Create multiple future enumerators with different IDs concurrently
+            var tasks = new List<Task>();
+            for (int i = 0; i < 20; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetFutureAsyncEnumerator($"future-enum-{taskId}", CancellationToken.None);
+                        Interlocked.Increment(ref successCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - All should succeed
+            Assert.Equal(20, successCount);
+            Assert.Empty(exceptions);
+        }
+
+        [Fact]
+        public async Task OrderedCache_EnumeratorDisposal_Concurrent_ThreadSafe()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var enumerators = new System.Collections.Concurrent.ConcurrentBag<IAsyncEnumerator<IEntry<Guid, string>>>();
+
+            // Create multiple enumerators
+            for (int i = 0; i < 20; i++)
+            {
+                var enumerator = cache.GetAsyncEnumerator($"enum-{i}", CancellationToken.None);
+                enumerators.Add(enumerator);
+            }
+
+            // Act - Dispose all enumerators concurrently
+            var tasks = new List<Task>();
+            foreach (var enumerator in enumerators)
+            {
+                tasks.Add(Task.Run(async () => await enumerator.DisposeAsync()));
+            }
+
+            // Should complete without deadlock or exceptions
+            await Task.WhenAll(tasks);
+
+            // Assert - No exceptions thrown, all disposed successfully
+            Assert.Equal(20, enumerators.Count);
+        }
+
+        [Fact]
+        public async Task OrderedCache_ConcurrentEnumeratorCreationAndDisposal_NoRaceCondition()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var activeCount = 0;
+            var maxActiveCount = 0;
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+
+            // Act - Continuously create and dispose enumerators
+            var tasks = new List<Task>();
+            for (int i = 0; i < 50; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetAsyncEnumerator($"enum-{taskId}", CancellationToken.None);
+                        var current = Interlocked.Increment(ref activeCount);
+                        
+                        // Track maximum concurrent enumerators
+                        int currentMax;
+                        do
+                        {
+                            currentMax = maxActiveCount;
+                            if (current <= currentMax) break;
+                        } while (Interlocked.CompareExchange(ref maxActiveCount, current, currentMax) != currentMax);
+
+                        await Task.Delay(10); // Simulate some work
+                        await enumerator.DisposeAsync();
+                        Interlocked.Decrement(ref activeCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - No exceptions, all operations completed
+            Assert.Empty(exceptions);
+            Assert.Equal(0, activeCount); // All should be disposed
+            Assert.True(maxActiveCount > 0, "At least some enumerators should have been active concurrently");
+        }
+
+        [Fact]
+        public async Task OrderedCache_MixedEnumeratorOperations_Concurrent_ThreadSafe()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("initial", out _);
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+            var enumerators = new System.Collections.Concurrent.ConcurrentBag<IAsyncEnumerator<IEntry<Guid, string>>>();
+
+            // Act - Mix of GetAsyncEnumerator, GetFutureAsyncEnumerator, and disposal
+            var tasks = new List<Task>();
+            
+            // Create regular enumerators
+            for (int i = 0; i < 15; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetAsyncEnumerator($"regular-{taskId}", CancellationToken.None);
+                        enumerators.Add(enumerator);
+                        await Task.Delay(20);
+                        await enumerator.DisposeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            // Create future enumerators
+            for (int i = 0; i < 15; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetFutureAsyncEnumerator($"future-{taskId}", CancellationToken.None);
+                        enumerators.Add(enumerator);
+                        await Task.Delay(20);
+                        await enumerator.DisposeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert
+            Assert.Empty(exceptions);
+            Assert.Equal(30, enumerators.Count);
+        }
+
+        [Fact]
+        public async Task OrderedCache_EnumeratorCreation_DuringAddOperations_ThreadSafe()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+            var enumeratorCount = 0;
+            var addCount = 0;
+
+            // Act - Create enumerators while adding items
+            var tasks = new List<Task>();
+
+            // Enumerator creation tasks
+            for (int i = 0; i < 10; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetAsyncEnumerator($"enum-{taskId}", CancellationToken.None);
+                        Interlocked.Increment(ref enumeratorCount);
+                        await Task.Delay(10);
+                        await enumerator.DisposeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            // Add operations
+            for (int i = 0; i < 20; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        cache.Add($"item-{taskId}", out _);
+                        Interlocked.Increment(ref addCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert
+            Assert.Empty(exceptions);
+            Assert.Equal(10, enumeratorCount);
+            Assert.Equal(20, addCount);
+        }
+
+        [Fact]
+        public async Task OrderedCache_EnumeratorDisposal_DuringEviction_ThreadSafe()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+            var enumerators = new System.Collections.Concurrent.ConcurrentBag<IAsyncEnumerator<IEntry<Guid, string>>>();
+
+            // Create several enumerators
+            for (int i = 0; i < 5; i++)
+            {
+                var enumerator = cache.GetAsyncEnumerator($"enum-{i}", CancellationToken.None);
+                enumerators.Add(enumerator);
+            }
+
+            var tasks = new List<Task>();
+
+            // Act - Add items to trigger eviction while disposing enumerators
+            for (int i = 0; i < 10; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        cache.Add($"item-{taskId}", out _);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            // Dispose enumerators concurrently
+            foreach (var enumerator in enumerators)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await enumerator.DisposeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - No deadlocks or exceptions
+            Assert.Empty(exceptions);
+        }
+
+        [Fact]
+        public async Task OrderedCache_SameIdRaceCondition_OnlyOneSucceeds()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var sharedId = "shared-enum-id";
+            var successCount = 0;
+            var failureCount = 0;
+
+            // Act - Aggressive concurrent attempts to create enumerator with same ID
+            var tasks = new List<Task>();
+            for (int i = 0; i < 100; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        var enumerator = cache.GetAsyncEnumerator(sharedId, CancellationToken.None);
+                        Interlocked.Increment(ref successCount);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        Interlocked.Increment(ref failureCount);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert - Exactly one should succeed
+            Assert.Equal(1, successCount);
+            Assert.Equal(99, failureCount);
+        }
+
+        [Fact]
+        public async Task OrderedCache_EnumeratorRemoval_IsThreadSafe()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var enumerators = new List<IAsyncEnumerator<IEntry<Guid, string>>>();
+
+            // Create 50 enumerators
+            for (int i = 0; i < 50; i++)
+            {
+                enumerators.Add(cache.GetAsyncEnumerator($"enum-{i}", CancellationToken.None));
+            }
+
+            // Act - Dispose all enumerators concurrently (tests RemoveEnumerator thread safety)
+            var disposeTasks = enumerators.Select(e => Task.Run(async () => await e.DisposeAsync())).ToArray();
+            await Task.WhenAll(disposeTasks);
+
+            // Assert - All should complete without exceptions
+            Assert.True(disposeTasks.All(t => t.IsCompletedSuccessfully));
+        }
+
+        #endregion
     }
 }
