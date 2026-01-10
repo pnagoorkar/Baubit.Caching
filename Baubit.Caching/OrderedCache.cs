@@ -34,6 +34,7 @@ namespace Baubit.Caching
         private readonly ICacheAsyncEnumeratorFactory<TId, TValue> enumeratorFactory;
 
         private readonly CacheEnumeratorCollection<TId> activeEnumerators;
+        private readonly SemaphoreSlim enumeratorSemaphore = new SemaphoreSlim(1, 1);
         private int additionsSinceLastEviction = 0;
         #endregion
 
@@ -454,10 +455,18 @@ namespace Baubit.Caching
 
         private IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumeratorInternal(string id, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
-            var retVal = enumeratorFactory.CreateEnumerator(this, e => activeEnumerators.Remove(e), id, cancellationToken);
-            activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
-            return retVal;
+            enumeratorSemaphore.Wait();
+            try
+            {
+                if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
+                var retVal = enumeratorFactory.CreateEnumerator(this, RemoveEnumerator, id, cancellationToken);
+                activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
+                return retVal;
+            }
+            finally
+            {
+                enumeratorSemaphore.Release();
+            }
         }
 
         /// <summary>
@@ -469,10 +478,36 @@ namespace Baubit.Caching
         /// <returns>An asynchronous enumerator for future cache entries.</returns>
         public IAsyncEnumerator<IEntry<TId, TValue>> GetFutureAsyncEnumerator(string id = null, CancellationToken cancellationToken = default)
         {
-            if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
-            var retVal = enumeratorFactory.CreateFutureEnumerator(this, e => activeEnumerators.Remove(e), id, cancellationToken);
-            activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
-            return retVal;
+            enumeratorSemaphore.Wait();
+            try
+            {
+                if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
+                var retVal = enumeratorFactory.CreateFutureEnumerator(this, RemoveEnumerator, id, cancellationToken);
+                activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
+                return retVal;
+            }
+            finally
+            {
+                enumeratorSemaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Removes an enumerator from the active enumerators collection in a thread-safe manner.
+        /// This method is called when an enumerator is disposed.
+        /// </summary>
+        /// <param name="enumerator">The enumerator to remove.</param>
+        private void RemoveEnumerator(ICacheEnumerator<TId> enumerator)
+        {
+            enumeratorSemaphore.Wait();
+            try
+            {
+                activeEnumerators.Remove(enumerator);
+            }
+            finally
+            {
+                enumeratorSemaphore.Release();
+            }
         }
 
         /// <inheritdoc/>
@@ -533,6 +568,7 @@ namespace Baubit.Caching
                     }
                     finally { Locker.ExitWriteLock(); }
                     Locker.Dispose();
+                    enumeratorSemaphore?.Dispose();
                 }
                 disposedValue = true;
             }
