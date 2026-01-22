@@ -1,0 +1,27 @@
+<Project>
+  
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Project Dependencies -->
+    <PackageVersion Include="Baubit.Tasks" Version="2025.49.1" />
+    <PackageVersion Include="Baubit.Collections" Version="2025.48.2" />
+    <PackageVersion Include="Baubit.Identity" Version="2025.51.1" />
+    <PackageVersion Include="Baubit.Configuration" Version="2025.51.2" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.5" />
+    
+    <!-- Benchmark Dependencies -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache" Version="2.4.0" />
+    
+    <!-- Test Dependencies -->
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>
