@@ -3,6 +3,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>Latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyVersion>$(AssemblyVersion)</AssemblyVersion>
@@ -25,13 +26,25 @@
     <None Include="../LICENSE" Pack="true" PackagePath="." />
   </ItemGroup>
 
+  <!-- Use project reference when UseLocalBaubitDependencies is true -->
+  <ItemGroup Condition="'$(UseLocalBaubitDependencies)' == 'true'">
+    <ProjectReference Include="$(BaubitTasksProjectPath)" />
+    <ProjectReference Include="$(BaubitCollectionsProjectPath)" />
+    <ProjectReference Include="$(BaubitIdentityProjectPath)" />
+    <ProjectReference Include="$(BaubitConfigurationProjectPath)" />
+  </ItemGroup>
+
+  <!-- Use package reference when UseLocalBaubitDependencies is false -->
+  <ItemGroup Condition="'$(UseLocalBaubitDependencies)' != 'true'">
+    <PackageReference Include="Baubit.Tasks"/>
+    <PackageReference Include="Baubit.Collections"/>
+    <PackageReference Include="Baubit.Identity"/>
+    <PackageReference Include="Baubit.Configuration"/>
+  </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="Baubit.Tasks" Version="2025.49.1" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.5" />
-    <PackageReference Include="Baubit.Collections" Version="2025.48.2" />
-    <PackageReference Include="Baubit.Identity" Version="2025.51.1" />
-    <PackageReference Include="Baubit.Configuration" Version="2025.51.2" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces"/>
+    <PackageReference Include="Microsoft.Extensions.Logging"/>
   </ItemGroup>
 
 </Project>

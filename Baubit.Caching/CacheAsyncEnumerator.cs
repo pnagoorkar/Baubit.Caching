@@ -15,10 +15,12 @@ namespace Baubit.Caching
         /// </summary>
         /// <param name="cache">The cache to enumerate.</param>
         /// <param name="onDispose">Callback invoked when the enumerator is disposed.</param>
+        /// <param name="id">The identifier of the enumerator. If not provided, a new GUID will be generated.</param>
         /// <param name="cancellationToken">A token to cancel the enumeration.</param>
         public CacheAsyncEnumerator(IOrderedCache<TId, TValue> cache,
                                     Action<ICacheEnumerator<TId>> onDispose,
-                                    CancellationToken cancellationToken = default) : base(cache, onDispose, cancellationToken)
+                                    string id = null,
+                                    CancellationToken cancellationToken = default) : base(cache, onDispose, id, cancellationToken)
         {
         }
     }

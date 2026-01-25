@@ -258,7 +258,7 @@ jobs:
 
       - run:
           name: Pack_and_publish
-          command: pack_and_publish_signed_prerelease
+          command: pack_and_publish_signed
 #======================================= End PackAndPublish ====================================
 
 #======================================= Release =========================================

@@ -16,7 +16,7 @@
 Thread-safe ordered cache with O(1) lookups, two-tier storage, and async enumeration.
 
 #### **In 30 seconds:** 
-`OrderedCache<T>` is an append-ordered, time-sortable cache. Each entry gets a GuidV7 (time-ordered ID) by default, or you can use custom ID types. You can:
+`OrderedCache<TId, TValue>` is an append-ordered, time-sortable cache with generic ID support. Each entry uses IDs like GuidV7 (time-ordered) or custom types (int, long). You can:
 - fetch any entry by ID in O(1),
 - walk entries in chronological order,
 - `await foreach` future entries with zero polling,
@@ -172,14 +172,12 @@ while (await enumerator.MoveNextAsync()) // yields immediately when producer add
 
 `OrderedCache<TId, TValue>` supports generic identifier types. `TId` must be a struct implementing `IComparable<TId>` and `IEquatable<TId>`.
 
-**Built-in specialization**: `OrderedCache<TValue>` uses Guid (GuidV7, time-ordered) as the identifier type.
-
-**Custom ID types**: Implement `OrderedCache<TId, TValue>` with int, long, or custom structs for domain-specific ordering.
+**Common ID types**: Guid (GuidV7, time-ordered), int, long, or custom structs for domain-specific ordering.
 
 ### Entry
 
-An `IEntry<TValue>` (or `IEntry<TId, TValue>`) represents a cache entry:
-- **Id** (`Guid` by default, or custom `TId`): Entry identifier
+An `IEntry<TId, TValue>` represents a cache entry:
+- **Id** (`TId`): Entry identifier (e.g., Guid, int, long)
 - **CreatedOnUTC** (`DateTime`): UTC timestamp when entry was added
 - **Value** (`TValue`): The cached data
 
@@ -211,7 +209,7 @@ This ensures iteration continues even when entries are removed out-of-order.
 
 ```text
 +-------------------------------------------------------+
-|                  OrderedCache<TValue>                 |
+|           OrderedCache<TId, TValue>                   |
 |                                                       |
 |   +----------------+        +-------------------+     |
 |   |    L1 Store    |  ───▶  |     L2 Store      |     |
@@ -240,43 +238,14 @@ This ensures iteration continues even when entries are removed out-of-order.
 ## API Reference
 
 <details>
-<summary><strong>IOrderedCache&lt;TValue&gt; (Guid-based)</strong> (click to expand)</summary>
-
-Specialized interface using Guid (GuidV7) identifiers. Inherits from `IOrderedCache<Guid, TValue>`.
-
-```csharp
-public interface IOrderedCache<TValue> : IAsyncEnumerable<IEntry<TValue>>, IDisposable
-{
-    long Count { get; }
-    
-    // Write Operations
-    bool Add(TValue value, out IEntry<TValue> entry);
-    bool Update(Guid id, TValue value);
-    bool Remove(Guid id, out IEntry<TValue>? entry);
-    bool Clear();
-    
-    // Synchronous Read Operations
-    bool GetEntryOrDefault(Guid? id, out IEntry<TValue>? entry);
-    bool GetNextOrDefault(Guid? id, out IEntry<TValue>? entry);
-    bool GetFirstOrDefault(out IEntry<TValue>? entry);
-    bool GetFirstIdOrDefault(out Guid? id);
-    bool GetLastOrDefault(out IEntry<TValue>? entry);
-    bool GetLastIdOrDefault(out Guid? id);
-    
-    // Asynchronous Operations
-    Task<IEntry<TValue>> GetNextAsync(Guid? id = null, CancellationToken ct = default);
-    Task<IEntry<TValue>> GetFutureFirstOrDefaultAsync(CancellationToken ct = default);
-}
-```
-</details>
-
-<details>
-<summary><strong>IOrderedCache&lt;TId, TValue&gt; (Generic)</strong> (click to expand)</summary>
+<summary><strong>IOrderedCache&lt;TId, TValue&gt;</strong> (click to expand)</summary>
 
 Generic interface supporting custom identifier types. `TId` must be a struct implementing `IComparable<TId>` and `IEquatable<TId>`.
 
 ```csharp
-public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValue>>, IDisposable 
+public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValue>>, 
+                                               IFutureAsyncEnumerable<IEntry<TId, TValue>>, 
+                                               IDisposable 
     where TId : struct, IComparable<TId>, IEquatable<TId>
 {
     long Count { get; }
@@ -296,21 +265,65 @@ public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValu
     bool GetLastIdOrDefault(out TId? id);
     
     // Asynchronous Operations
-    Task<IEntry<TId, TValue>> GetNextAsync(TId? id = null, CancellationToken ct = default);
-    Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken ct = default);
+    Task<IEntry<TId, TValue>> GetNextAsync(TId? id = null, CancellationToken cancellationToken = default);
+    Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken cancellationToken = default);
+    
+    // Enumerator Management (with optional IDs for tracking)
+    IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumerator(string id = null, CancellationToken cancellationToken = default);
+    IAsyncEnumerator<IEntry<TId, TValue>> GetFutureAsyncEnumerator(string id = null, CancellationToken cancellationToken = default);
+    
+    // Typed Enumeration Operations
+    IAsyncEnumerable<(TId, T)> EnumerateAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
+    IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
+    Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler, object state, CancellationToken cancellationToken = default) where T : TValue;
 }
 ```
 </details>
 
 <details>
-<summary><strong>IEntry&lt;TValue&gt;</strong> (click to expand)</summary>
+<summary><strong>IEntry&lt;TId, TValue&gt;</strong> (click to expand)</summary>
+
+Represents a cache entry with identifier, timestamp, and value.
 
 ```csharp
-public interface IEntry<TValue>
+public interface IEntry<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
 {
-    Guid Id { get; }              // GuidV7 (time-ordered)
+    TId Id { get; }
     DateTime CreatedOnUTC { get; }
     TValue Value { get; }
+}
+```
+</details>
+
+<details>
+<summary><strong>ICacheEnumerator&lt;TId&gt;</strong> (click to expand)</summary>
+
+Interface for cache enumerators with position and identifier tracking.
+
+```csharp
+public interface ICacheEnumerator<TId> where TId : struct
+{
+    TId? CurrentId { get; }  // Current position in enumeration
+    string Id { get; }       // Enumerator identifier (for tracking/deduplication)
+}
+```
+</details>
+
+<details>
+<summary><strong>Configuration</strong> (click to expand)</summary>
+
+Configuration class for cache behavior including adaptive resizing and eviction policies.
+
+```csharp
+public class Configuration : Baubit.Configuration.Configuration
+{
+    bool RunAdaptiveResizing { get; set; } = false;     // Enable L1 dynamic sizing
+    int AdaptionWindowMS { get; set; } = 2_000;         // Resize evaluation interval (ms)
+    int GrowStep { get; set; } = 64;                    // L1 growth increment
+    int ShrinkStep { get; set; } = 32;                  // L1 shrink decrement
+    double RoomRateLowerLimit { get; set; } = 1;        // Shrink threshold (entries/sec)
+    double RoomRateUpperLimit { get; set; } = 5;        // Grow threshold (entries/sec)
+    int EvictAfterEveryX { get; set; } = 100;           // Eviction frequency (adds)
 }
 ```
 </details>
@@ -327,9 +340,9 @@ using Microsoft.Extensions.Logging;
 var config = new Configuration { EvictAfterEveryX = 100 };
 using var loggerFactory = LoggerFactory.Create(builder => { });
 var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
-var metadata = new Metadata<Guid>(config, loggerFactory);
-var l1Store = new Store<Guid, string>(100, 1000, _ => null, loggerFactory); // Min: 100, Max: 1000, no ID gen
-var l2Store = new Store<Guid, string>(null, null, lastId => 
+var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, loggerFactory);
+var l1Store = new Baubit.Caching.InMemory.Store<Guid, string>(100, 1000, _ => null, loggerFactory); // Min: 100, Max: 1000, no ID gen
+var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => 
 {
     if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
     return identityGenerator.GetNext();
@@ -352,9 +365,9 @@ using Microsoft.Extensions.Logging;
 // Usage with integer IDs
 var config = new Configuration { EvictAfterEveryX = 100 };
 using var loggerFactory = LoggerFactory.Create(builder => { });
-var metadata = new Metadata<int>(config, loggerFactory);
-var l1Store = new Store<int, string>(100, 1000, _ => null, loggerFactory); // No ID gen
-var l2Store = new Store<int, string>(null, null, lastId => lastId.HasValue ? lastId.Value + 1 : 1, loggerFactory); // Sequential IDs
+var metadata = new Baubit.Caching.InMemory.Metadata<int>(config, loggerFactory);
+var l1Store = new Baubit.Caching.InMemory.Store<int, string>(100, 1000, _ => null, loggerFactory); // No ID gen
+var l2Store = new Baubit.Caching.InMemory.Store<int, string>(null, null, lastId => lastId.HasValue ? lastId.Value + 1 : 1, loggerFactory); // Sequential IDs
 
 using var cache = new OrderedCache<int, string>(
     config, l1Store, l2Store, metadata, loggerFactory
@@ -403,18 +416,47 @@ cache.GetLastIdOrDefault(out var lastId);
 
 ```csharp
 // Enumerate existing entries (from head to tail)
-var enumerator = cache.GetAsyncEnumerator(cancellationToken);
+var enumerator = cache.GetAsyncEnumerator(null, cancellationToken);
 while (await enumerator.MoveNextAsync())
 {
     Console.WriteLine($"{enumerator.Current.Id}: {enumerator.Current.Value}");
 }
 
 // Wait for future entries (blocks until new entries arrive)
-var enumerator = cache.GetFutureAsyncEnumerator(cancellationToken);
+var enumerator = cache.GetFutureAsyncEnumerator(null, cancellationToken);
 while (await enumerator.MoveNextAsync())
 {
     Console.WriteLine($"New: {enumerator.Current.Value}");
 }
+
+// Named enumerators for tracking and deduplication
+var consumer1 = cache.GetAsyncEnumerator("consumer-1");
+var consumer2 = cache.GetFutureAsyncEnumerator("consumer-2");
+// Duplicate id throws InvalidOperationException
+// var duplicate = cache.GetAsyncEnumerator("consumer-1"); // throws!
+
+// Typed enumeration - filter by value type
+await foreach (var (id, stringValue) in cache.EnumerateAsync<string>())
+{
+    Console.WriteLine($"{id}: {stringValue}");
+}
+
+// Typed future enumeration - only future entries of specific type
+await foreach (var (id, eventData) in cache.EnumerateFutureAsync<EventData>())
+{
+    Console.WriteLine($"Future event {id}: {eventData}");
+}
+
+// Handler-based processing of future entries
+await cache.OnNextAsync<string>(
+    async (tuple, state, ct) =>
+    {
+        var (id, value) = tuple;
+        await ProcessAsync(id, value, ct);
+        return true; // Continue processing
+    },
+    state: null,
+    cancellationToken);
 
 // Wait for next entry after current position
 var next = await cache.GetNextAsync(currentId, cancellationToken);
@@ -441,7 +483,7 @@ _ = Task.Run(async () =>
 var consumer1Cts = new CancellationTokenSource();
 _ = Task.Run(async () =>
 {
-    var enumerator = cache.GetFutureAsyncEnumerator(consumer1Cts.Token);
+    var enumerator = cache.GetFutureAsyncEnumerator("fast-consumer", consumer1Cts.Token);
     while (await enumerator.MoveNextAsync())
     {
         Console.WriteLine($"[Fast] {enumerator.Current.Value}");
@@ -453,7 +495,7 @@ _ = Task.Run(async () =>
 var consumer2Cts = new CancellationTokenSource();
 _ = Task.Run(async () =>
 {
-    var enumerator = cache.GetFutureAsyncEnumerator(consumer2Cts.Token);
+    var enumerator = cache.GetFutureAsyncEnumerator("slow-consumer", consumer2Cts.Token);
     while (await enumerator.MoveNextAsync())
     {
         Console.WriteLine($"[Slow] {enumerator.Current.Value}");
@@ -532,13 +574,13 @@ Assert.Equal(0, cache.Count);
 ```csharp
 public class Configuration : Baubit.Configuration.Configuration
 {
-    bool RunAdaptiveResizing { get; init; } = false;  // Enable L1 dynamic sizing
-    int AdaptionWindowMS { get; init; } = 2_000;      // Resize evaluation interval
-    int GrowStep { get; init; } = 64;                 // L1 growth increment
-    int ShrinkStep { get; init; } = 32;               // L1 shrink decrement
-    double RoomRateLowerLimit { get; init; } = 1;     // Shrink threshold (entries/sec)
-    double RoomRateUpperLimit { get; init; } = 5;     // Grow threshold (entries/sec)
-    int EvictAfterEveryX { get; init; } = 100;        // Eviction frequency (adds)
+    bool RunAdaptiveResizing { get; set; } = false;  // Enable L1 dynamic sizing
+    int AdaptionWindowMS { get; set; } = 2_000;      // Resize evaluation interval
+    int GrowStep { get; set; } = 64;                 // L1 growth increment
+    int ShrinkStep { get; set; } = 32;               // L1 shrink decrement
+    double RoomRateLowerLimit { get; set; } = 1;     // Shrink threshold (entries/sec)
+    double RoomRateUpperLimit { get; set; } = 5;     // Grow threshold (entries/sec)
+    int EvictAfterEveryX { get; set; } = 100;        // Eviction frequency (adds)
 }
 ```
 
@@ -634,6 +676,20 @@ See [Baubit.Caching.Benchmark/RESULTS.md](Baubit.Caching.Benchmark/RESULTS.md) f
 **A:** 
 - `GetNextAsync(id)`: Waits for the next entry after `id`. Returns immediately if it exists, blocks otherwise.
 - `GetFutureAsyncEnumerator()`: Returns an `IAsyncEnumerable` starting from the current tail, yielding all future entries as they're added.
+
+### Q: What are enumerator IDs and when should I use them?
+
+**A:** Each enumerator has a unique `Id` property (auto-generated GUID by default). You can provide custom ids:
+```csharp
+var enumerator = cache.GetAsyncEnumerator("my-consumer");
+```
+
+**Benefits:**
+- Prevents duplicate enumerators (throws `InvalidOperationException` if id already active)
+- Enables tracking which consumer is processing which entries
+- Useful for debugging and monitoring multiple consumers
+
+**Note:** Enumerator ids are only unique while the enumerator is active. After disposal, the id can be reused.
 
 ## Benchmarks
 

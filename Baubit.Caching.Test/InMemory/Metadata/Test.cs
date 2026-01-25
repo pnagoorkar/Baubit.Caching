@@ -451,5 +451,149 @@ namespace Baubit.Caching.Test.InMemory.Metadata
             Assert.True(result);
             Assert.Null(nextId);
         }
+
+        [Fact]
+        public void Metadata_Constructor_WithStartingIds_InitializesInOrder()
+        {
+            // Arrange
+            var id1 = Guid.Parse("30000000-0000-0000-0000-000000000000");
+            var id2 = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            var id3 = Guid.Parse("20000000-0000-0000-0000-000000000000");
+            var startingIds = new List<Guid> { id1, id2, id3 };
+
+            // Act
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                startingIds);
+
+            // Assert - Should be ordered: id2, id3, id1
+            Assert.Equal(3, metadata.Count);
+            Assert.Equal(id2, metadata.HeadId);
+            Assert.Equal(id1, metadata.TailId);
+            Assert.True(metadata.ContainsKey(id1));
+            Assert.True(metadata.ContainsKey(id2));
+            Assert.True(metadata.ContainsKey(id3));
+        }
+
+        [Fact]
+        public void Metadata_Constructor_WithStartingIds_GuaranteesDirectAccess()
+        {
+            // Arrange
+            var id1 = GenerateNextId();
+            var id2 = GenerateNextId();
+            var id3 = GenerateNextId();
+            var startingIds = new List<Guid> { id1, id2, id3 };
+
+            // Act
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                startingIds);
+
+            // Assert - Direct access to each id should work
+            Assert.True(metadata.ContainsKey(id1));
+            Assert.True(metadata.ContainsKey(id2));
+            Assert.True(metadata.ContainsKey(id3));
+            
+            // GetNextId should work for all entries
+            Assert.True(metadata.GetNextId(null, out var firstId));
+            Assert.Equal(id1, firstId);
+            
+            Assert.True(metadata.GetNextId(id1, out var secondId));
+            Assert.Equal(id2, secondId);
+            
+            Assert.True(metadata.GetNextId(id2, out var thirdId));
+            Assert.Equal(id3, thirdId);
+        }
+
+        [Fact]
+        public void Metadata_Constructor_WithNullStartingIds_InitializesEmpty()
+        {
+            // Arrange & Act
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                null);
+
+            // Assert
+            Assert.Equal(0, metadata.Count);
+            Assert.Null(metadata.HeadId);
+            Assert.Null(metadata.TailId);
+        }
+
+        [Fact]
+        public void Metadata_Constructor_WithEmptyStartingIds_InitializesEmpty()
+        {
+            // Arrange
+            var startingIds = new List<Guid>();
+
+            // Act
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                startingIds);
+
+            // Assert
+            Assert.Equal(0, metadata.Count);
+            Assert.Null(metadata.HeadId);
+            Assert.Null(metadata.TailId);
+        }
+
+        [Fact]
+        public void Metadata_Constructor_WithDuplicateStartingIds_ThrowsArgumentException()
+        {
+            // Arrange
+            var id1 = GenerateNextId();
+            var id2 = GenerateNextId();
+            var startingIds = new List<Guid> { id1, id2, id1 }; // id1 appears twice
+
+            // Act & Assert
+            Assert.Throws<ArgumentException>(() => new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                startingIds));
+        }
+
+        [Fact]
+        public void Metadata_Constructor_WithSingleStartingId_SetsHeadAndTailToSameValue()
+        {
+            // Arrange
+            var id = GenerateNextId();
+            var startingIds = new List<Guid> { id };
+
+            // Act
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                startingIds);
+
+            // Assert
+            Assert.Equal(1, metadata.Count);
+            Assert.Equal(id, metadata.HeadId);
+            Assert.Equal(id, metadata.TailId);
+        }
+
+        [Fact]
+        public void Metadata_Constructor_WithStartingIds_AllowsSubsequentAddTail()
+        {
+            // Arrange
+            var id1 = GenerateNextId();
+            var id2 = GenerateNextId();
+            var startingIds = new List<Guid> { id1, id2 };
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(
+                new Caching.Configuration(), 
+                NullLoggerFactory.Instance, 
+                startingIds);
+
+            // Act
+            var id3 = GenerateNextId();
+            var result = metadata.AddTail(id3);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(3, metadata.Count);
+            Assert.Equal(id3, metadata.TailId);
+        }
     }
 }

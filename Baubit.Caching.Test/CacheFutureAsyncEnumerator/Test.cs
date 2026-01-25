@@ -101,7 +101,7 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             var cts = new CancellationTokenSource();
 
             // Act
-            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator(cts.Token);
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator(null, cts.Token);
             var moveTask = enumerator.MoveNextAsync().AsTask();
 
             await Task.Delay(50);
@@ -161,6 +161,121 @@ namespace Baubit.Caching.Test.CacheFutureAsyncEnumerator
             await enumerator.DisposeAsync();
 
             // Assert - No exception thrown
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Id_WithProvidedId_ReturnsProvidedId()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var expectedId = "FutureEnumerator456";
+
+            // Act
+            var enumerator = new CacheFutureAsyncEnumerator<Guid, string>(
+                cache, 
+                null, 
+                expectedId);
+
+            // Assert
+            Assert.Equal(expectedId, enumerator.Id);
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Id_WithoutProvidedId_ReturnsGuid()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+
+            // Act
+            var enumerator = new CacheFutureAsyncEnumerator<Guid, string>(
+                cache, 
+                null);
+
+            // Assert
+            Assert.NotNull(enumerator.Id);
+            Assert.NotEmpty(enumerator.Id);
+            // Verify it's a valid GUID string
+            Assert.True(Guid.TryParse(enumerator.Id, out _));
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Id_WithEmptyString_ReturnsEmptyString()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+
+            // Act
+            var enumerator = new CacheFutureAsyncEnumerator<Guid, string>(
+                cache, 
+                null, 
+                "");
+
+            // Assert
+            // Empty string should be treated as provided id (not null), so it should be returned as-is
+            Assert.Equal("", enumerator.Id);
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Id_ThroughCache_WithProvidedId_ReturnsProvidedId()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var expectedId = "FutureCacheLevelEnumerator";
+
+            // Act
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator(expectedId);
+
+            // Assert
+            Assert.Equal(expectedId, enumerator.Id);
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_Id_ThroughCache_WithoutProvidedId_ReturnsGuid()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+
+            // Act
+            var enumerator = (CacheFutureAsyncEnumerator<Guid, string>)cache.GetFutureAsyncEnumerator();
+
+            // Assert
+            Assert.NotNull(enumerator.Id);
+            Assert.NotEmpty(enumerator.Id);
+            // Verify it's a valid GUID string
+            Assert.True(Guid.TryParse(enumerator.Id, out _));
+        }
+
+        [Fact]
+        public void CacheFutureAsyncEnumerator_DuplicateId_ThrowsInvalidOperationException()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var duplicateId = "duplicate-future-enumerator";
+
+            // Act - Create first enumerator with the id
+            var enumerator1 = cache.GetFutureAsyncEnumerator(duplicateId);
+
+            // Assert - Attempting to create second enumerator with same id throws
+            var exception = Assert.Throws<InvalidOperationException>(() => 
+                cache.GetFutureAsyncEnumerator(duplicateId));
+            Assert.Contains(duplicateId, exception.Message);
+        }
+
+        [Fact]
+        public async Task CacheFutureAsyncEnumerator_DuplicateId_AfterDispose_AllowsReuse()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var reuseId = "reusable-future-enumerator";
+
+            // Act - Create, use, and dispose first enumerator
+            var enumerator1 = cache.GetFutureAsyncEnumerator(reuseId);
+            await enumerator1.DisposeAsync();
+
+            // Assert - Can create new enumerator with same id after disposal
+            var enumerator2 = cache.GetFutureAsyncEnumerator(reuseId);
+            Assert.Equal(reuseId, ((ICacheEnumerator<Guid>)enumerator2).Id);
+            await enumerator2.DisposeAsync();
         }
     }
 }

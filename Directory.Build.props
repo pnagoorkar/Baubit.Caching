@@ -1,0 +1,14 @@
+<Project>
+  
+  <!-- Import the root Directory.Build.props if it exists (for monorepo builds) -->
+  <!-- When building standalone, this import is skipped gracefully -->
+  <PropertyGroup>
+    <ParentBuildPropsPath>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))</ParentBuildPropsPath>
+  </PropertyGroup>
+  <Import Project="$(ParentBuildPropsPath)" Condition="'$(ParentBuildPropsPath)' != ''" />
+  
+  <!-- This file is intentionally minimal. Paths to Baubit dependencies are defined -->
+  <!-- in the root Directory.Build.props when building the monorepo solution. -->
+  <!-- When building standalone, properties from the monorepo are not available (by design). -->
+  
+</Project>

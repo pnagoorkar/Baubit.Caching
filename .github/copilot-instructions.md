@@ -13,7 +13,7 @@ This is part of the **Baubit framework** - a collection of focused, componentize
 ## Technology Stack
 
 - **Target Framework**: .NET Standard 2.0 (for broad compatibility)
-- **Language**: C# with language features compatible with .NET Standard 2.0
+- **Language**: C# 7.3 (compatible with .NET Standard 2.0)
 - **Testing**: xUnit with comprehensive unit and integration tests
 - **CI/CD**: CircleCI with automated build, test, and publish pipelines
 - **Package Distribution**: NuGet (GitHub Packages for pre-release, NuGet.org for releases)
@@ -26,20 +26,20 @@ All Baubit components follow a consistent structure:
 
 ```
 Baubit.{ComponentName}/
-├── Baubit.{ComponentName}/              # Main library project
-│   ├── {Core classes and interfaces}
-│   └── Baubit.{ComponentName}.csproj    # Targets .NET Standard 2.0
-├── Baubit.{ComponentName}.Test/        # Test project
-│   ├── {Test classes}
-│   └── Baubit.{ComponentName}.Test.csproj
-├── .circleci/                           # CI/CD configuration
-│   └── config.yml                       # Build, test, pack, publish pipeline
-├── Baubit.{ComponentName}.sln           # Solution file
-├── README.md                            # Comprehensive documentation
-├── codecov.yml                          # Code coverage configuration
-├── LICENSE                              # MIT License
-└── .github/
-    └── copilot-instructions.md          # This file
++-- Baubit.{ComponentName}/              # Main library project
+|   +-- {Core classes and interfaces}
+|   +-- Baubit.{ComponentName}.csproj    # Targets .NET Standard 2.0
++-- Baubit.{ComponentName}.Test/        # Test project
+|   +-- {Test classes}
+|   +-- Baubit.{ComponentName}.Test.csproj
++-- .circleci/                           # CI/CD configuration
+|   +-- config.yml                       # Build, test, pack, publish pipeline
++-- Baubit.{ComponentName}.sln           # Solution file
++-- README.md                            # Comprehensive documentation
++-- codecov.yml                          # Code coverage configuration
++-- LICENSE                              # MIT License
++-- .github/
+    +-- copilot-instructions.md          # This file
 ```
 
 ## Coding Standards
@@ -58,7 +58,7 @@ Baubit.{ComponentName}/
 
 2. **Naming Conventions**
    - PascalCase for public members, types, and namespaces
-   - camelCase for private fields
+   - camelCase for private fields (no underscore prefix)
    - Prefix interfaces with `I` (e.g., `IValidator`)
    - Suffix async methods with `Async` (e.g., `ValidateAsync`)
    - Use meaningful, descriptive names - avoid abbreviations
@@ -68,7 +68,7 @@ Baubit.{ComponentName}/
    - Group related functionality in namespaces matching folder structure
    - Keep classes focused - prefer composition over large inheritance hierarchies
    - Order class members: constants, fields, constructors, properties, methods
-   - Group by access modifier (public → protected → private)
+   - Group by access modifier (public -> protected -> private)
 
 4. **Documentation**
    - XML documentation comments for ALL public APIs
@@ -121,7 +121,7 @@ Baubit.{ComponentName}/
 
 1. **Test Organization**
    - Mirror source project structure in test project
-   - One test class per source class: `{ClassName}.Test` in`{ClassName}/Test.cs`
+   - One test class per source class: `{ClassName}.Test` in `{ClassName}/Test.cs`
    - Group tests by feature using nested classes or clear method names
    - Use descriptive test method names: `MethodName_Scenario_ExpectedBehavior`
 

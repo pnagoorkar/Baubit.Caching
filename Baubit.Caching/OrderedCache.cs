@@ -2,6 +2,8 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,6 +34,7 @@ namespace Baubit.Caching
         private readonly ICacheAsyncEnumeratorFactory<TId, TValue> enumeratorFactory;
 
         private readonly CacheEnumeratorCollection<TId> activeEnumerators;
+        private readonly SemaphoreSlim enumeratorSemaphore = new SemaphoreSlim(1, 1);
         private int additionsSinceLastEviction = 0;
         #endregion
 
@@ -397,7 +400,7 @@ namespace Baubit.Caching
             while (l1Store?.HasCapacity == true &&
                    metadata.GetNextId(l1Store.LastAddedId, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
-                   nextEntry != null && l1Store.Add(nextEntry));
+                   nextEntry != null && l1Store.Add(nextEntry)) ;
             return true;
         }
 
@@ -434,24 +437,115 @@ namespace Baubit.Caching
         /// </summary>
         /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
         /// <returns>An asynchronous enumerator for the cache entries.</returns>
-        public IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        IAsyncEnumerator<IEntry<TId, TValue>> IAsyncEnumerable<IEntry<TId, TValue>>.GetAsyncEnumerator(CancellationToken cancellationToken)
         {
-            var retVal = enumeratorFactory.CreateEnumerator(this, e => activeEnumerators.Remove(e), cancellationToken);
-            activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
-            return retVal;
+            return GetAsyncEnumeratorInternal(null, cancellationToken);
         }
 
         /// <summary>
-        /// Returns an asynchronous enumerator that iterates through future cache entries starting from the current tail.
+        /// Returns an asynchronous enumerator with a specified identifier that iterates through the cache entries from the current head.
+        /// </summary>
+        /// <param name="id">The identifier of the enumerator. If not provided, a new GUID will be generated.</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
+        /// <returns>An asynchronous enumerator for the cache entries.</returns>
+        public IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumerator(string id = null, CancellationToken cancellationToken = default)
+        {
+            return GetAsyncEnumeratorInternal(id, cancellationToken);
+        }
+
+        private IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumeratorInternal(string id, CancellationToken cancellationToken)
+        {
+            enumeratorSemaphore.Wait();
+            try
+            {
+                if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
+                var retVal = enumeratorFactory.CreateEnumerator(this, RemoveEnumerator, id, cancellationToken);
+                activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
+                return retVal;
+            }
+            finally
+            {
+                enumeratorSemaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Returns an asynchronous enumerator with a specified identifier that iterates through future cache entries starting from the current tail.
         /// This enumerator waits for new entries to be added to the cache.
         /// </summary>
+        /// <param name="id">The identifier of the enumerator. If not provided, a new GUID will be generated.</param>
         /// <param name="cancellationToken">A token to cancel the asynchronous enumeration.</param>
         /// <returns>An asynchronous enumerator for future cache entries.</returns>
-        public IAsyncEnumerator<IEntry<TId, TValue>> GetFutureAsyncEnumerator(CancellationToken cancellationToken = default)
+        public IAsyncEnumerator<IEntry<TId, TValue>> GetFutureAsyncEnumerator(string id = null, CancellationToken cancellationToken = default)
         {
-            var retVal = enumeratorFactory.CreateFutureEnumerator(this, e => activeEnumerators.Remove(e), cancellationToken);
-            activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
-            return retVal;
+            enumeratorSemaphore.Wait();
+            try
+            {
+                if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
+                var retVal = enumeratorFactory.CreateFutureEnumerator(this, RemoveEnumerator, id, cancellationToken);
+                activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
+                return retVal;
+            }
+            finally
+            {
+                enumeratorSemaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Removes an enumerator from the active enumerators collection in a thread-safe manner.
+        /// This method is called when an enumerator is disposed.
+        /// </summary>
+        /// <param name="enumerator">The enumerator to remove.</param>
+        private void RemoveEnumerator(ICacheEnumerator<TId> enumerator)
+        {
+            enumeratorSemaphore.Wait();
+            try
+            {
+                activeEnumerators.Remove(enumerator);
+            }
+            finally
+            {
+                enumeratorSemaphore.Release();
+            }
+        }
+
+        /// <inheritdoc/>
+        public async IAsyncEnumerable<(TId, T)> EnumerateAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
+        {
+            var enumerator = GetAsyncEnumerator(null, cancellationToken);
+            while (await enumerator.MoveNextAsync())
+            {
+                if (enumerator.Current.Value is T value)
+                {
+                    yield return (enumerator.Current.Id, value);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
+        {
+            var enumerator = GetFutureAsyncEnumerator(null, cancellationToken);
+            while (await enumerator.MoveNextAsync())
+            {
+                if (enumerator.Current.Value is T value)
+                {
+                    yield return (enumerator.Current.Id, value);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler,
+                                               object state,
+                                               CancellationToken cancellationToken = default) where T : TValue
+        {
+            await foreach (var tuple in EnumerateFutureAsync<T>(cancellationToken))
+            {
+                await handler?.Invoke(tuple, state, cancellationToken);
+            }
+            return true;
         }
 
         /// <summary>
@@ -474,6 +568,7 @@ namespace Baubit.Caching
                     }
                     finally { Locker.ExitWriteLock(); }
                     Locker.Dispose();
+                    enumeratorSemaphore?.Dispose();
                 }
                 disposedValue = true;
             }
@@ -485,6 +580,5 @@ namespace Baubit.Caching
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
-
     }
 }
