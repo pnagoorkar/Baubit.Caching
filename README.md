@@ -268,6 +268,10 @@ public interface IOrderedCache<TId, TValue> : IAsyncEnumerable<IEntry<TId, TValu
     Task<IEntry<TId, TValue>> GetNextAsync(TId? id = null, CancellationToken cancellationToken = default);
     Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsync(CancellationToken cancellationToken = default);
     
+    // Enumerator Management (with optional IDs for tracking)
+    IAsyncEnumerator<IEntry<TId, TValue>> GetAsyncEnumerator(string id = null, CancellationToken cancellationToken = default);
+    IAsyncEnumerator<IEntry<TId, TValue>> GetFutureAsyncEnumerator(string id = null, CancellationToken cancellationToken = default);
+    
     // Typed Enumeration Operations
     IAsyncEnumerable<(TId, T)> EnumerateAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
     IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>(CancellationToken cancellationToken = default) where T : TValue;
@@ -287,6 +291,20 @@ public interface IEntry<TId, TValue> where TId : struct, IComparable<TId>, IEqua
     TId Id { get; }
     DateTime CreatedOnUTC { get; }
     TValue Value { get; }
+}
+```
+</details>
+
+<details>
+<summary><strong>ICacheEnumerator&lt;TId&gt;</strong> (click to expand)</summary>
+
+Interface for cache enumerators with position and identifier tracking.
+
+```csharp
+public interface ICacheEnumerator<TId> where TId : struct
+{
+    TId? CurrentId { get; }  // Current position in enumeration
+    string Id { get; }       // Enumerator identifier (for tracking/deduplication)
 }
 ```
 </details>
@@ -398,14 +416,14 @@ cache.GetLastIdOrDefault(out var lastId);
 
 ```csharp
 // Enumerate existing entries (from head to tail)
-var enumerator = cache.GetAsyncEnumerator(cancellationToken);
+var enumerator = cache.GetAsyncEnumerator(null, cancellationToken);
 while (await enumerator.MoveNextAsync())
 {
     Console.WriteLine($"{enumerator.Current.Id}: {enumerator.Current.Value}");
 }
 
 // Wait for future entries (blocks until new entries arrive)
-var enumerator = cache.GetFutureAsyncEnumerator(cancellationToken);
+var enumerator = cache.GetFutureAsyncEnumerator(null, cancellationToken);
 while (await enumerator.MoveNextAsync())
 {
     Console.WriteLine($"New: {enumerator.Current.Value}");
@@ -416,6 +434,29 @@ var consumer1 = cache.GetAsyncEnumerator("consumer-1");
 var consumer2 = cache.GetFutureAsyncEnumerator("consumer-2");
 // Duplicate id throws InvalidOperationException
 // var duplicate = cache.GetAsyncEnumerator("consumer-1"); // throws!
+
+// Typed enumeration - filter by value type
+await foreach (var (id, stringValue) in cache.EnumerateAsync<string>())
+{
+    Console.WriteLine($"{id}: {stringValue}");
+}
+
+// Typed future enumeration - only future entries of specific type
+await foreach (var (id, eventData) in cache.EnumerateFutureAsync<EventData>())
+{
+    Console.WriteLine($"Future event {id}: {eventData}");
+}
+
+// Handler-based processing of future entries
+await cache.OnNextAsync<string>(
+    async (tuple, state, ct) =>
+    {
+        var (id, value) = tuple;
+        await ProcessAsync(id, value, ct);
+        return true; // Continue processing
+    },
+    state: null,
+    cancellationToken);
 
 // Wait for next entry after current position
 var next = await cache.GetNextAsync(currentId, cancellationToken);
@@ -442,7 +483,7 @@ _ = Task.Run(async () =>
 var consumer1Cts = new CancellationTokenSource();
 _ = Task.Run(async () =>
 {
-    var enumerator = cache.GetFutureAsyncEnumerator(consumer1Cts.Token);
+    var enumerator = cache.GetFutureAsyncEnumerator("fast-consumer", consumer1Cts.Token);
     while (await enumerator.MoveNextAsync())
     {
         Console.WriteLine($"[Fast] {enumerator.Current.Value}");
@@ -454,7 +495,7 @@ _ = Task.Run(async () =>
 var consumer2Cts = new CancellationTokenSource();
 _ = Task.Run(async () =>
 {
-    var enumerator = cache.GetFutureAsyncEnumerator(consumer2Cts.Token);
+    var enumerator = cache.GetFutureAsyncEnumerator("slow-consumer", consumer2Cts.Token);
     while (await enumerator.MoveNextAsync())
     {
         Console.WriteLine($"[Slow] {enumerator.Current.Value}");
