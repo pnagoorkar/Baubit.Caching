@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -59,6 +60,29 @@ namespace Baubit.Caching.InMemory
         {
             logger = loggerFactory.CreateLogger<Metadata<TId>>();
             this.Configuration = configuration;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Metadata{TId}"/> class with optional starting identifiers.
+        /// </summary>
+        /// <param name="configuration">The cache configuration.</param>
+        /// <param name="loggerFactory">The logger factory for diagnostics.</param>
+        /// <param name="startingIds">Optional collection of identifiers to initialize the metadata with. 
+        /// If provided, the identifiers will be ordered and added to the metadata in ascending order.
+        /// This is useful for resuming sessions where the cache needs to be pre-populated with existing entries.</param>
+        /// <exception cref="ArgumentException">Thrown if startingIds contains duplicate identifiers.</exception>
+        public Metadata(Configuration configuration,
+                        ILoggerFactory loggerFactory,
+                        IEnumerable<TId> startingIds = null) : this(configuration, loggerFactory)
+        {
+            if (startingIds != null)
+            {
+                foreach (TId id in startingIds.OrderBy(x => x))
+                {
+                    if (IdNodeMap.ContainsKey(id)) throw new ArgumentException($"Duplicate ids found in {nameof(startingIds)}");
+                    IdNodeMap.Add(id, CurrentOrder.AddLast(id));
+                }
+            }
         }
 
         /// <inheritdoc/>
