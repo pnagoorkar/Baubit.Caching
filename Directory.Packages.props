@@ -1,10 +1,18 @@
 <Project>
   
+  <!-- Import the root Directory.Packages.props if it exists (for monorepo builds) -->
+  <!-- When building standalone, this import is skipped gracefully -->
+  <PropertyGroup>
+    <ParentPackagesPropsPath>$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)../'))</ParentPackagesPropsPath>
+  </PropertyGroup>
+  <Import Project="$(ParentPackagesPropsPath)" Condition="'$(ParentPackagesPropsPath)' != ''" />
+  
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!-- Define package versions only when parent doesn't exist (standalone builds) -->
+  <ItemGroup Condition="'$(ParentPackagesPropsPath)' == ''">
     <!-- Project Dependencies -->
     <PackageVersion Include="Baubit.Tasks" Version="2025.49.1" />
     <PackageVersion Include="Baubit.Collections" Version="2025.48.2" />
