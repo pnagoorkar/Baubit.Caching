@@ -14,7 +14,7 @@
   <!-- Define package versions only when parent doesn't exist (standalone builds) -->
   <ItemGroup Condition="'$(ParentPackagesPropsPath)' == ''">
     <!-- Project Dependencies -->
-    <PackageVersion Include="Baubit.Tasks" Version="2025.49.1" />
+    <PackageVersion Include="Baubit.Tasks" Version="2026.18.2" />
     <PackageVersion Include="Baubit.Collections" Version="2025.48.2" />
     <PackageVersion Include="Baubit.Identity" Version="2025.51.1" />
     <PackageVersion Include="Baubit.Configuration" Version="2026.2.1" />
@@ -27,9 +27,9 @@
     
     <!-- Test Dependencies -->
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageVersion Include="xunit" Version="2.9.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
 
 </Project>

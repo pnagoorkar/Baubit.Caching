@@ -30,6 +30,7 @@ namespace Baubit.Caching
         private Action<ICacheEnumerator<TId>> onDispose;
         private CancellationToken cancellationToken;
         private CancellationTokenRegistration cancellationTokenRegistration;
+        private int disposed = 0;
         /// <summary>
         /// Initializes a new instance of the <see cref="BaseCacheAsyncEnumerator{TId, TValue}"/> class.
         /// </summary>
@@ -46,7 +47,7 @@ namespace Baubit.Caching
             this.onDispose = onDispose;
             this.cancellationToken = cancellationToken;
             this.Id = id ?? Guid.NewGuid().ToString();
-            cancellationTokenRegistration = this.cancellationToken.Register(() => DisposeAsync());
+            this.cancellationToken.Register(disposable => Task.Run(() => ((IAsyncDisposable)disposable).DisposeAsync()), this);
         }
         /// <summary>
         /// Disposes the enumerator asynchronously.
@@ -54,8 +55,11 @@ namespace Baubit.Caching
         /// <returns>A value task representing the asynchronous dispose operation.</returns>
         public virtual ValueTask DisposeAsync()
         {
-            onDispose?.Invoke(this);
-            cancellationTokenRegistration.Dispose();
+            if (Interlocked.CompareExchange(ref disposed, 1, 0) == 0)
+            {
+                onDispose?.Invoke(this);
+                cancellationTokenRegistration.Dispose();
+            }
             return default(ValueTask);
         }
         /// <summary>
