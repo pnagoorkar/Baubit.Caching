@@ -17,7 +17,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var config = new Caching.Configuration();
             var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
             var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, NullLoggerFactory.Instance);
-            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => 
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId =>
             {
                 if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
                 return identityGenerator.GetNext();
@@ -152,8 +152,8 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
 
             // Act
             var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(
-                cache, 
-                null, 
+                cache,
+                null,
                 expectedId);
 
             // Assert
@@ -168,7 +168,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
 
             // Act
             var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(
-                cache, 
+                cache,
                 null);
 
             // Assert
@@ -186,8 +186,8 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
 
             // Act
             var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(
-                cache, 
-                null, 
+                cache,
+                null,
                 "");
 
             // Assert
@@ -236,7 +236,7 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var enumerator1 = cache.GetAsyncEnumerator(duplicateId);
 
             // Assert - Attempting to create second enumerator with same id throws
-            var exception = Assert.Throws<InvalidOperationException>(() => 
+            var exception = Assert.Throws<InvalidOperationException>(() =>
                 cache.GetAsyncEnumerator(duplicateId));
             Assert.Contains(duplicateId, exception.Message);
         }
@@ -256,6 +256,60 @@ namespace Baubit.Caching.Test.CacheAsyncEnumerator
             var enumerator2 = cache.GetAsyncEnumerator(reuseId);
             Assert.Equal(reuseId, ((ICacheEnumerator<Guid>)enumerator2).Id);
             await enumerator2.DisposeAsync();
+        }
+
+        [Fact]
+        public async Task CacheAsyncEnumerator_DoubleDispose_DoesNotThrow()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            cache.Add("test", out _);
+            var enumerator = cache.GetAsyncEnumerator();
+
+            // Act & Assert - Double dispose should not throw
+            await enumerator.DisposeAsync();
+            await enumerator.DisposeAsync();
+        }
+
+        [Fact]
+        public async Task CacheAsyncEnumerator_DisposeAsync_WithNullOnDispose_DoesNotThrow()
+        {
+            // Arrange - Create enumerator with null onDispose callback
+            using var cache = CreateTestCache();
+            var enumerator = new Caching.CacheAsyncEnumerator<Guid, string>(cache, null);
+
+            // Act & Assert
+            await enumerator.DisposeAsync();
+        }
+
+        [Fact]
+        public void CacheAsyncEnumeratorFactory_CreateEnumerator_ReturnsCorrectType()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var factory = new CacheAsyncEnumeratorFactory<Guid, string>();
+
+            // Act
+            var enumerator = factory.CreateEnumerator(cache, null, "test-id");
+
+            // Assert
+            Assert.IsType<Caching.CacheAsyncEnumerator<Guid, string>>(enumerator);
+            Assert.Equal("test-id", ((ICacheEnumerator<Guid>)enumerator).Id);
+        }
+
+        [Fact]
+        public void CacheAsyncEnumeratorFactory_CreateFutureEnumerator_ReturnsCorrectType()
+        {
+            // Arrange
+            using var cache = CreateTestCache();
+            var factory = new CacheAsyncEnumeratorFactory<Guid, string>();
+
+            // Act
+            var enumerator = factory.CreateFutureEnumerator(cache, null, "future-id");
+
+            // Assert
+            Assert.IsType<Caching.CacheFutureAsyncEnumerator<Guid, string>>(enumerator);
+            Assert.Equal("future-id", ((ICacheEnumerator<Guid>)enumerator).Id);
         }
     }
 }
