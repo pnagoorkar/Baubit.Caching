@@ -14,7 +14,7 @@
   <!-- Define package versions only when parent doesn't exist (standalone builds) -->
   <ItemGroup Condition="'$(ParentPackagesPropsPath)' == ''">
     <!-- Project Dependencies -->
-    <PackageVersion Include="Baubit.Tasks" Version="2026.18.2" />
+    <PackageVersion Include="Baubit.Tasks" Version="2026.22.1" />
     <PackageVersion Include="Baubit.Collections" Version="2025.48.2" />
     <PackageVersion Include="Baubit.Identity" Version="2025.51.1" />
     <PackageVersion Include="Baubit.Configuration" Version="2026.2.1" />
