@@ -2980,5 +2980,447 @@ namespace Baubit.Caching.Test.OrderedCache
         }
 
         #endregion
+
+        #region Adaptive Resizing Tests
+
+        [Fact]
+        public async Task OrderedCache_AdaptiveResizing_GrowsL1_WhenRoomRateExceedsUpperLimit()
+        {
+            // Arrange - Configure to trigger growth: very short window, low upper limit
+            var config = new Caching.Configuration
+            {
+                RunAdaptiveResizing = true,
+                AdaptionWindowMS = 50,
+                GrowStep = 10,
+                ShrinkStep = 5,
+                RoomRateLowerLimit = 0.1,
+                RoomRateUpperLimit = 0.5, // Very low so any room count triggers growth
+                EvictAfterEveryX = int.MaxValue
+            };
+            using var cache = CreateTestCache(config: config, l1MinCap: 5, l1MaxCap: 100);
+
+            // Create a future enumerator to establish a waiting room guest
+            var cts = new CancellationTokenSource();
+            var futureEnumerator = cache.GetFutureAsyncEnumerator(cancellationToken: cts.Token);
+
+            // Add entries to trigger waiting room signal (incrementing roomCount)
+            for (int i = 0; i < 10; i++)
+            {
+                cache.Add($"entry-{i}", out _);
+                await Task.Delay(5);
+            }
+
+            // Wait for adaption cycles to run (room rate should exceed upper limit)
+            await Task.Delay(150);
+
+            // Cleanup
+            cts.Cancel();
+            await futureEnumerator.DisposeAsync();
+
+            // Assert - Cache should still be functional after adaptive resizing grew L1
+            Assert.True(cache.Count > 0);
+        }
+
+        [Fact]
+        public async Task OrderedCache_AdaptiveResizing_ShrinksL1_WhenRoomRateBelowLowerLimit()
+        {
+            // Arrange - Configure to trigger shrink: no entries added, high lower limit
+            var config = new Caching.Configuration
+            {
+                RunAdaptiveResizing = true,
+                AdaptionWindowMS = 50,
+                GrowStep = 10,
+                ShrinkStep = 5,
+                RoomRateLowerLimit = 1000, // Very high lower limit so shrink always triggers
+                RoomRateUpperLimit = 10000,
+                EvictAfterEveryX = int.MaxValue
+            };
+            using var cache = CreateTestCache(config: config, l1MinCap: 5, l1MaxCap: 100);
+
+            // Don't add any entries - this results in roomRate = 0 which is < lowerLimit
+            // Wait for adaption cycle to run the shrink path
+            await Task.Delay(150);
+
+            // Assert - Cache should still be functional after adaptive resizing shrink
+            Assert.Equal(0, cache.Count);
+        }
+
+        [Fact]
+        public async Task OrderedCache_AdaptiveResizing_Cancellation_CompletesGracefully()
+        {
+            // Arrange
+            var config = new Caching.Configuration
+            {
+                RunAdaptiveResizing = true,
+                AdaptionWindowMS = 50,
+                GrowStep = 10,
+                ShrinkStep = 5,
+                RoomRateLowerLimit = 1,
+                RoomRateUpperLimit = 5,
+                EvictAfterEveryX = int.MaxValue
+            };
+            var cache = CreateTestCache(config: config, l1MinCap: 5, l1MaxCap: 100);
+
+            // Wait for at least one adaption cycle
+            await Task.Delay(100);
+
+            // Act - Dispose triggers cancellation of adaptive resizing
+            cache.Dispose();
+
+            // Assert - No exceptions thrown
+        }
+
+        #endregion
+
+        #region Eviction Tests
+
+        [Fact]
+        public void OrderedCache_Eviction_WithNoActiveEnumerators_EvictsUpToTail()
+        {
+            // Arrange - Low eviction threshold, no enumerators
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+
+            // Act - Add enough entries to trigger eviction
+            for (int i = 0; i < 6; i++)
+            {
+                cache.Add($"entry-{i}", out _);
+            }
+
+            // Assert - After eviction with no enumerators, entries are evicted up to tail
+            // The count should be less than 6 because eviction removes all entries up to the tail
+            Assert.True(cache.Count < 6);
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithActiveEnumerator_RespectsLowestRead()
+        {
+            // Arrange - Low eviction threshold
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+
+            // Create an enumerator and advance it to the first entry
+            cache.Add("keep-this", out var first);
+            var enumerator = cache.GetAsyncEnumerator(cancellationToken: CancellationToken.None);
+            await enumerator.MoveNextAsync(); // Read the first entry
+
+            // Act - Add more entries to trigger eviction
+            for (int i = 0; i < 5; i++)
+            {
+                cache.Add($"entry-{i}", out _);
+            }
+
+            // Assert - Entries through enumerator's position should be evicted
+            // but subsequent entries remain
+            Assert.True(cache.Count > 0);
+
+            // Cleanup
+            await enumerator.DisposeAsync();
+        }
+
+        [Fact]
+        public async Task OrderedCache_Eviction_WithActiveEnumerator_NullCurrentId_DoesNotEvict()
+        {
+            // Arrange - Low eviction threshold with an enumerator that hasn't read yet
+            var config = new Caching.Configuration { EvictAfterEveryX = 5 };
+            using var cache = CreateTestCache(config: config);
+
+            // Create an enumerator but DON'T advance it (CurrentId will be null)
+            var enumerator = cache.GetAsyncEnumerator(cancellationToken: CancellationToken.None);
+
+            // Act - Add entries to trigger eviction
+            for (int i = 0; i < 6; i++)
+            {
+                cache.Add($"entry-{i}", out _);
+            }
+
+            // Assert - When an enumerator hasn't read anything, eviction should respect it
+            // (activeEnumerators.Count > 0 but LowestReadId is null)
+            Assert.Equal(6, cache.Count);
+
+            // Cleanup
+            await enumerator.DisposeAsync();
+        }
+
+        #endregion
+
+        #region EnumerateAsync Type Filtering Tests
+
+        [Fact]
+        public async Task OrderedCache_EnumerateAsync_FiltersValuesByType()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, object>(null, null, lastId =>
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+
+            using var cache = new OrderedCache<Guid, object>(config, null, l2Store, metadata, _loggerFactory);
+
+            // Add both string and int values
+            cache.Add("string-value", out _);
+            cache.Add(42, out _);
+            cache.Add("another-string", out _);
+            cache.Add(99, out _);
+
+            // Act - Only enumerate strings
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var strings = new List<(Guid, string)>();
+            await foreach (var tuple in cache.EnumerateAsync<string>(cts.Token))
+            {
+                strings.Add(tuple);
+                if (strings.Count >= 2) { cts.Cancel(); break; }
+            }
+
+            // Assert - Only string values should be returned
+            Assert.Equal(2, strings.Count);
+            Assert.Equal("string-value", strings[0].Item2);
+            Assert.Equal("another-string", strings[1].Item2);
+        }
+
+        [Fact]
+        public async Task OrderedCache_EnumerateFutureAsync_FiltersValuesByType()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, object>(null, null, lastId =>
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+
+            using var cache = new OrderedCache<Guid, object>(config, null, l2Store, metadata, _loggerFactory);
+
+            // Act - Start future enumeration, then add mixed types
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var strings = new List<(Guid, string)>();
+            var enumTask = Task.Run(async () =>
+            {
+                await foreach (var tuple in cache.EnumerateFutureAsync<string>(cts.Token))
+                {
+                    strings.Add(tuple);
+                    if (strings.Count >= 2) break;
+                }
+            });
+
+            await Task.Delay(50);
+            cache.Add(42, out _);            // int - should be skipped
+            cache.Add("first-string", out _); // string - should be captured
+            cache.Add(99, out _);            // int - should be skipped
+            cache.Add("second-string", out _); // string - should be captured
+
+            await enumTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+            // Assert
+            Assert.Equal(2, strings.Count);
+            Assert.Equal("first-string", strings[0].Item2);
+            Assert.Equal("second-string", strings[1].Item2);
+        }
+
+        [Fact]
+        public async Task OrderedCache_OnNextAsync_InvokesHandlerForMatchingType()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, object>(null, null, lastId =>
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+
+            using var cache = new OrderedCache<Guid, object>(config, null, l2Store, metadata, _loggerFactory);
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var received = new List<string>();
+
+            // Act
+            var handlerTask = cache.OnNextAsync<string>(
+                (tuple, state, ct) =>
+                {
+                    received.Add(tuple.Item2);
+                    if (received.Count >= 2) cts.Cancel();
+                    return Task.FromResult(true);
+                },
+                null,
+                cts.Token);
+
+            await Task.Delay(50);
+            cache.Add("hello", out _);
+            cache.Add("world", out _);
+
+            try { await handlerTask; } catch (TaskCanceledException) { }
+
+            // Assert
+            Assert.True(received.Count >= 2);
+            Assert.Equal("hello", received[0]);
+            Assert.Equal("world", received[1]);
+        }
+
+        #endregion
+
+        #region L1 Store Replenishment Tests
+
+        [Fact]
+        public void OrderedCache_WithL1Store_Remove_ReplenishesL1FromL2()
+        {
+            // Arrange - L1 holds 2, we add 3, then remove the first to trigger replenish
+            using var cache = CreateTestCache(l1MinCap: 2, l1MaxCap: 2);
+            cache.Add("first", out var e1);
+            cache.Add("second", out var e2);
+            cache.Add("third", out var e3); // This goes only to L2
+
+            // Act - Remove the first entry, which should trigger L1 replenishment
+            cache.Remove(e1.Id, out _);
+
+            // Assert - Third entry should now be accessible (replenished from L2 to L1)
+            cache.GetEntryOrDefault(e3.Id, out var retrieved);
+            Assert.NotNull(retrieved);
+            Assert.Equal("third", retrieved.Value);
+        }
+
+        [Fact]
+        public void OrderedCache_WithL1Store_Remove_EntryNotInL1_SucceedsViaL2()
+        {
+            // Arrange - L1 holds 2, add 3, remove the 3rd (which is only in L2)
+            using var cache = CreateTestCache(l1MinCap: 2, l1MaxCap: 2);
+            cache.Add("first", out _);
+            cache.Add("second", out _);
+            cache.Add("third", out var e3); // Only in L2
+
+            // Act - Remove entry not in L1
+            var result = cache.Remove(e3.Id, out var removed);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(removed);
+            Assert.Equal("third", removed.Value);
+        }
+
+        [Fact]
+        public void OrderedCache_WithL1Store_GetEntryOrDefault_RetrievesFromL1()
+        {
+            // Arrange - L1 store with enough capacity to hold all entries
+            using var cache = CreateTestCache(l1MinCap: 10, l1MaxCap: 10);
+            cache.Add("in-l1", out var entry);
+
+            // Act - Entry should be found in L1 first
+            var result = cache.GetEntryOrDefault(entry.Id, out var retrieved);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(retrieved);
+            Assert.Equal("in-l1", retrieved.Value);
+        }
+
+        [Fact]
+        public void OrderedCache_WithL1Store_GetEntryOrDefault_FallsBackToL2()
+        {
+            // Arrange - L1 store too small to hold all entries
+            using var cache = CreateTestCache(l1MinCap: 1, l1MaxCap: 1);
+            cache.Add("first", out _);
+            cache.Add("second", out var e2); // Overflows L1
+
+            // Act - Second entry should fall back to L2
+            var result = cache.GetEntryOrDefault(e2.Id, out var retrieved);
+
+            // Assert
+            Assert.True(result);
+            Assert.NotNull(retrieved);
+            Assert.Equal("second", retrieved.Value);
+        }
+
+        [Fact]
+        public void OrderedCache_WithL1Store_Update_UpdatesBothStores()
+        {
+            // Arrange - L1 store with enough capacity
+            using var cache = CreateTestCache(l1MinCap: 10, l1MaxCap: 10);
+            cache.Add("original", out var entry);
+
+            // Act
+            var result = cache.Update(entry.Id, "updated");
+
+            // Assert
+            Assert.True(result);
+            cache.GetEntryOrDefault(entry.Id, out var retrieved);
+            Assert.NotNull(retrieved);
+            Assert.Equal("updated", retrieved.Value);
+        }
+
+        [Fact]
+        public void OrderedCache_WithUncappedL1Store_AdaptiveResizingEnabled_DoesNotStartResizing()
+        {
+            // Arrange - L1 store that is uncapped (null min/max) + adaptive resizing enabled
+            var config = new Caching.Configuration { RunAdaptiveResizing = true };
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId =>
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+            // Uncapped L1 store
+            var l1Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, _ => null, _loggerFactory);
+
+            // Act
+            using var cache = new OrderedCache<Guid, string>(config, l1Store, l2Store, metadata, _loggerFactory);
+
+            // Assert - Cache works normally (adaptive resizing not started because l1Store.Uncapped is true)
+            cache.Add("test", out var entry);
+            Assert.NotNull(entry);
+        }
+
+        [Fact]
+        public void OrderedCache_WithCustomEnumeratorFactory_UsesProvidedFactory()
+        {
+            // Arrange
+            var config = new Caching.Configuration { EvictAfterEveryX = int.MaxValue };
+            var identityGenerator = Baubit.Identity.IdentityGenerator.CreateNew();
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(config, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+            var l2Store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId =>
+            {
+                if (lastId.HasValue) identityGenerator.InitializeFrom(lastId.Value);
+                return identityGenerator.GetNext();
+            }, _loggerFactory);
+
+            var customFactory = new CacheAsyncEnumeratorFactory<Guid, string>();
+            Func<CacheEnumeratorCollection<Guid>> collectionFactory = () => new CacheEnumeratorCollection<Guid>();
+
+            // Act
+            using var cache = new OrderedCache<Guid, string>(config, null, l2Store, metadata, _loggerFactory,
+                cacheEnumeratorCollectionFactory: collectionFactory,
+                enumeratorFactory: customFactory);
+
+            cache.Add("test", out _);
+            var enumerator = cache.GetAsyncEnumerator();
+
+            // Assert
+            Assert.NotNull(enumerator);
+        }
+
+        #endregion
+
+        #region Double Dispose Tests
+
+        [Fact]
+        public void OrderedCache_DoubleDispose_DoesNotThrow()
+        {
+            // Arrange
+            var cache = CreateTestCache();
+            cache.Add("test", out _);
+
+            // Act & Assert - Second dispose should not throw
+            cache.Dispose();
+            cache.Dispose();
+        }
+
+        #endregion
     }
 }

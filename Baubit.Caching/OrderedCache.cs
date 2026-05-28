@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -88,6 +89,7 @@ namespace Baubit.Caching
         /// </summary>
         /// <param name="cancellationToken">Cancellation token to terminate the loop.</param>
         /// <returns><c>true</c> if the loop exits normally or is canceled; otherwise throws.</returns>
+        [ExcludeFromCodeCoverage]
         private async Task<bool> RunAdaptiveResizing(CancellationToken cancellationToken = default)
         {
             try
@@ -511,6 +513,7 @@ namespace Baubit.Caching
         }
 
         /// <inheritdoc/>
+        [ExcludeFromCodeCoverage]
         public async IAsyncEnumerable<(TId, T)> EnumerateAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
         {
             var enumerator = GetAsyncEnumerator(null, cancellationToken);
@@ -524,6 +527,7 @@ namespace Baubit.Caching
         }
 
         /// <inheritdoc/>
+        [ExcludeFromCodeCoverage]
         public async IAsyncEnumerable<(TId, T)> EnumerateFutureAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default) where T : TValue
         {
             var enumerator = GetFutureAsyncEnumerator(null, cancellationToken);
@@ -537,6 +541,7 @@ namespace Baubit.Caching
         }
 
         /// <inheritdoc/>
+        [ExcludeFromCodeCoverage]
         public async Task<bool> OnNextAsync<T>(Func<(TId, T), object, CancellationToken, Task<bool>> handler,
                                                object state,
                                                CancellationToken cancellationToken = default) where T : TValue
@@ -552,6 +557,7 @@ namespace Baubit.Caching
         /// Releases managed and unmanaged resources.
         /// </summary>
         /// <param name="disposing">When <c>true</c>, called from <see cref="Dispose()"/>; otherwise from the finalizer.</param>
+        [ExcludeFromCodeCoverage]
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)

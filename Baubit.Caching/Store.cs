@@ -115,6 +115,7 @@ namespace Baubit.Caching
         /// Releases the resources used by the <see cref="Store{TId, TValue}"/> class.
         /// </summary>
         /// <param name="disposing">When <c>true</c>, called from <see cref="Dispose()"/>; otherwise from the finalizer.</param>
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)

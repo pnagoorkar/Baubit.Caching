@@ -511,5 +511,112 @@ namespace Baubit.Caching.Test.InMemory.Store
             // Assert after remove
             Assert.Equal(4, store.CurrentCapacity);
         }
+
+        [Fact]
+        public void Store_Update_WithNonTypedEntry_UsesFallbackPath()
+        {
+            // Arrange - Add entry via IEntry interface that is NOT Entry<TId, TValue>
+            var store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, lastId => {
+                var gen = Baubit.Identity.IdentityGenerator.CreateNew();
+                if (lastId.HasValue) gen.InitializeFrom(lastId.Value);
+                return gen.GetNext();
+            }, _loggerFactory);
+            var id = Guid.NewGuid();
+            var customEntry = new CustomEntry<Guid, string>(id, "original");
+            store.Add(customEntry);
+
+            // Act - Update using id+value overload (triggers fallback since stored entry is not Entry<TId, TValue>)
+            var result = store.Update(id, "updated");
+
+            // Assert
+            Assert.True(result);
+            store.GetValueOrDefault(id, out var value);
+            Assert.Equal("updated", value);
+        }
+
+        [Fact]
+        public void Store_Update_NonExistingId_ReturnsFalse()
+        {
+            // Arrange
+            var store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, _ => null, _loggerFactory);
+            var id = Guid.NewGuid();
+
+            // Act
+            var result = store.Update(id, "value");
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void Store_AddCapacity_OnUncappedStore_ReturnsTrue()
+        {
+            // Arrange
+            var store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, _ => null, _loggerFactory);
+
+            // Act
+            var result = store.AddCapacity(10);
+
+            // Assert
+            Assert.True(result);
+            Assert.True(store.Uncapped);
+        }
+
+        [Fact]
+        public void Store_CutCapacity_OnUncappedStore_ReturnsTrue()
+        {
+            // Arrange
+            var store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, _ => null, _loggerFactory);
+
+            // Act
+            var result = store.CutCapacity(10);
+
+            // Assert
+            Assert.True(result);
+            Assert.True(store.Uncapped);
+        }
+
+        [Fact]
+        public void Store_HasCapacity_WhenAtZeroCapacity_ReturnsFalse()
+        {
+            // Arrange - Capacity exactly equals count
+            var store = new Baubit.Caching.InMemory.Store<Guid, string>(1, 1, _ => null, _loggerFactory);
+            var id = Guid.NewGuid();
+            store.Add(id, "fill", out _);
+
+            // Act & Assert
+            Assert.False(store.HasCapacity);
+            Assert.Equal(0, store.CurrentCapacity);
+        }
+
+        [Fact]
+        public void Store_GetEntryOrDefault_NullId_ReturnsFalse()
+        {
+            // Arrange
+            var store = new Baubit.Caching.InMemory.Store<Guid, string>(null, null, _ => null, _loggerFactory);
+
+            // Act
+            var result = store.GetEntryOrDefault(null, out var entry);
+
+            // Assert
+            Assert.False(result);
+            Assert.Null(entry);
+        }
+    }
+
+    /// <summary>
+    /// Custom entry implementation for testing Update fallback path.
+    /// </summary>
+    internal class CustomEntry<TId, TValue> : IEntry<TId, TValue> where TId : struct, IComparable<TId>, IEquatable<TId>
+    {
+        public TId Id { get; set; }
+        public DateTime CreatedOnUTC { get; set; } = DateTime.UtcNow;
+        public TValue Value { get; set; }
+
+        public CustomEntry(TId id, TValue value)
+        {
+            Id = id;
+            Value = value;
+        }
     }
 }

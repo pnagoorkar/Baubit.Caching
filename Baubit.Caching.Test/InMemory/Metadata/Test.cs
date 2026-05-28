@@ -595,5 +595,293 @@ namespace Baubit.Caching.Test.InMemory.Metadata
             Assert.Equal(3, metadata.Count);
             Assert.Equal(id3, metadata.TailId);
         }
+
+        [Fact]
+        public void Metadata_GetNextId_WhenIdDeletedOutOfOrder_ReturnsNextGreaterId()
+        {
+            // Arrange - Add 3 ids, remove the middle one, then ask for next after the middle
+            var metadata = new Baubit.Caching.InMemory.Metadata<Guid>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            var id1 = GenerateNextId();
+            var id2 = GenerateNextId();
+            var id3 = GenerateNextId();
+            metadata.AddTail(id1);
+            metadata.AddTail(id2);
+            metadata.AddTail(id3);
+
+            // Remove middle id
+            metadata.Remove(id2);
+
+            // Act - Ask for next after the removed id (triggers FindNextGreaterId)
+            var result = metadata.GetNextId(id2, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(id3, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_WhenIdSmallerThanHead_ReturnsHead()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+            metadata.AddTail(30);
+
+            // Act - Ask for next after an id smaller than head
+            var result = metadata.GetNextId(5, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(10, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_WhenHeadIsNull_ReturnsNull()
+        {
+            // Arrange - Empty metadata with a non-null id request
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+
+            // Add and remove an entry to simulate the scenario where head is null
+            // but the caller has a non-null id
+            metadata.AddTail(10);
+            metadata.Remove(10);
+
+            // Act
+            var result = metadata.GetNextId(10, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_WhenIdIsTail_ReturnsNull()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+
+            // Act
+            var result = metadata.GetNextId(20, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(nextId);
+        }
+
+        [Fact]
+        public void Metadata_FindNextGreaterId_WhenNoGreaterIdExists_ReturnsNull()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+
+            // Remove 20, then ask for next after a value greater than all remaining
+            metadata.Remove(20);
+
+            // Act - Ask for next after 15 (not in map, FindNextGreaterId path, no greater id exists since only 10 left)
+            var result = metadata.GetNextId(15, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_WhenIdPrecedesHead_ReturnsEmpty()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+            metadata.AddTail(30);
+
+            // Act - id 5 precedes head 10
+            var result = metadata.GetIdsThrough(5, out var ids);
+
+            // Assert
+            Assert.False(result);
+            Assert.Empty(ids);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_WhenIdAtOrAfterTail_ReturnsWholeList()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+            metadata.AddTail(30);
+
+            // Act - id >= tail
+            var result = metadata.GetIdsThrough(30, out var ids);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(new[] { 10, 20, 30 }, ids);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_WhenIdNotInMap_ReturnsEmpty()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+            metadata.AddTail(30);
+
+            // Act - id 15 is between head and tail but not in map
+            var result = metadata.GetIdsThrough(15, out var ids);
+
+            // Assert
+            Assert.False(result);
+            Assert.Empty(ids);
+        }
+
+        [Fact]
+        public void Metadata_SignalAwaiters_WhenAdaptiveResizingEnabled_IncrementsRoomCount()
+        {
+            // Arrange
+            var config = new Caching.Configuration { RunAdaptiveResizing = true };
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(config, NullLoggerFactory.Instance);
+
+            // Create a waiter to ensure HasGuests is true
+            var cts = new CancellationTokenSource();
+            var waiterTask = metadata.GetNextIdAsync(null, cts.Token);
+
+            // Act - Add tail triggers SignalAwaiters with RunAdaptiveResizing enabled
+            metadata.AddTail(1);
+
+            // Assert
+            var roomCount = metadata.ResetRoomCount();
+            Assert.Equal(1, roomCount);
+
+            cts.Cancel();
+        }
+
+        [Fact]
+        public void Metadata_IsIdSmallerThanHeadId_WithNullId_ReturnsFalse()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+
+            // Act - null id passed to GetNextId returns head
+            var result = metadata.GetNextId(null, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(10, nextId);
+        }
+
+        [Fact]
+        public void Metadata_SignalAwaiters_WhenAdaptiveResizingDisabled_DoesNotIncrementRoomCount()
+        {
+            // Arrange - RunAdaptiveResizing is false (default)
+            var config = new Caching.Configuration { RunAdaptiveResizing = false };
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(config, NullLoggerFactory.Instance);
+
+            // Create a waiter to ensure HasGuests is true
+            var cts = new CancellationTokenSource();
+            var waiterTask = metadata.GetNextIdAsync(null, cts.Token);
+
+            // Act - Add tail triggers SignalAwaiters but RunAdaptiveResizing is false
+            metadata.AddTail(1);
+
+            // Assert - Room count should NOT be incremented
+            var roomCount = metadata.ResetRoomCount();
+            Assert.Equal(0, roomCount);
+
+            cts.Cancel();
+        }
+
+        [Fact]
+        public void Metadata_GetNextId_InBetweenNode_ReturnsNext()
+        {
+            // Arrange - Add 3 entries, ask for next after the middle one
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+            metadata.AddTail(30);
+
+            // Act - Get next after middle id (hits IdNodeMap.TryGetValue path, node.Next is not null)
+            var result = metadata.GetNextId(20, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(30, nextId);
+        }
+
+        [Fact]
+        public void Metadata_FindNextGreaterId_WithMultipleGreaterIds_ReturnsSmallest()
+        {
+            // Arrange - Add ids 10, 30, 50; remove 20 (not present) to trigger FindNextGreaterId
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(30);
+            metadata.AddTail(50);
+
+            // Remove 30 to make GetNextId(25) trigger FindNextGreaterId
+            metadata.Remove(30);
+
+            // Act - 25 is not in map, not smaller than head, not tail -> FindNextGreaterId
+            // Should find 50 (only remaining id > 25)
+            var result = metadata.GetNextId(25, out var nextId);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(50, nextId);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_MiddleId_ReturnsHeadThroughId()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+            metadata.AddTail(30);
+
+            // Act - Get ids from head through 20 (middle)
+            var result = metadata.GetIdsThrough(20, out var ids);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(new[] { 10, 20 }, ids);
+        }
+
+        [Fact]
+        public void Metadata_GetIdsThrough_AfterTail_ReturnsAllIds()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+
+            // Act - id 100 is beyond tail
+            var result = metadata.GetIdsThrough(100, out var ids);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(new[] { 10, 20 }, ids);
+        }
+
+        [Fact]
+        public void Metadata_Dispose_ClearsAllState()
+        {
+            // Arrange
+            var metadata = new Baubit.Caching.InMemory.Metadata<int>(new Caching.Configuration(), NullLoggerFactory.Instance);
+            metadata.AddTail(10);
+            metadata.AddTail(20);
+
+            // Act
+            metadata.Dispose();
+
+            // Assert - After dispose, double dispose should not throw
+            metadata.Dispose();
+        }
     }
 }
