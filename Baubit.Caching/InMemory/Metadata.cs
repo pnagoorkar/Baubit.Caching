@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Baubit.Tasks;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
