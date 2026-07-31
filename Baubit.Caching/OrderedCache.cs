@@ -558,11 +558,14 @@ namespace Baubit.Caching
             {
                 if (disposing)
                 {
+                    // Cancel and wait for the adaptive resizing loop BEFORE acquiring the write lock.
+                    // If the loop has already passed Task.Delay and is blocked on EnterWriteLock,
+                    // holding the write lock here while waiting for it would deadlock.
+                    adaptionCTS?.Cancel();
+                    adaptionRunner?.Wait(true);
                     Locker.EnterWriteLock();
                     try
                     {
-                        adaptionCTS?.Cancel();
-                        adaptionRunner?.Wait(true);
                         l1Store?.Dispose();
                         l2Store?.Dispose();
                     }
