@@ -36,6 +36,10 @@ namespace Baubit.Caching
         private readonly CacheEnumeratorCollection<TId> activeEnumerators;
         private readonly SemaphoreSlim enumeratorSemaphore = new SemaphoreSlim(1, 1);
         private int additionsSinceLastEviction = 0;
+        private readonly CacheTelemetryContext telemetry;
+        // Keeps the L1 capacity provider delegate alive for exactly as long as this cache instance;
+        // Telemetry only ever holds a weak reference to it.
+        private readonly Func<long?> l1CapacityProvider;
         #endregion
 
         #region ProtectedMembers
@@ -74,6 +78,16 @@ namespace Baubit.Caching
             this.metadata = metadata;
             this.activeEnumerators = cacheEnumeratorCollectionFactory?.Invoke() ?? new CacheEnumeratorCollection<TId>();
             this.enumeratorFactory = enumeratorFactory ?? new CacheAsyncEnumeratorFactory<TId, TValue>();
+            this.telemetry = new CacheTelemetryContext(cacheConfiguration?.Name);
+            if (this.l1Store != null)
+            {
+                // Report current L1 target capacity through a single shared observable instrument.
+                // The registration is weakly referenced and does not keep this cache alive; the
+                // provider delegate's lifetime is tied to this cache instance via l1CapacityProvider.
+                var l1StoreRef = this.l1Store;
+                this.l1CapacityProvider = () => l1StoreRef.TargetCapacity;
+                this.telemetry.RegisterL1CapacityProvider(this.l1CapacityProvider);
+            }
             if (this.l1Store != null && !this.l1Store.Uncapped && Configuration?.RunAdaptiveResizing == true)
             {
                 // Start a background loop that adjusts L1 capacity based on production rate.
@@ -105,11 +119,13 @@ namespace Baubit.Caching
                     if (roomRate > Configuration.RoomRateUpperLimit)
                     {
                         l1Store?.AddCapacity(Configuration.GrowStep);
+                        telemetry.RecordResize("grow");
                         logger.LogTrace($"Resized L1Store. New size: {l1Store?.TargetCapacity}");
                     }
                     else if (roomRate < Configuration.RoomRateLowerLimit)
                     {
                         l1Store?.CutCapacity(Configuration.ShrinkStep);
+                        telemetry.RecordResize("shrink");
                         logger.LogTrace($"Resized L1Store. New size: {l1Store?.TargetCapacity}");
                     }
                     Locker.EnterWriteLock();
@@ -133,20 +149,27 @@ namespace Baubit.Caching
         /// <inheritdoc/>
         public bool Add(TValue value, out IEntry<TId, TValue> entry)
         {
+            var start = telemetry.BeginDuration();
             Locker.EnterWriteLock();
             try
             {
                 if (disposedValue) { entry = default(IEntry<TId, TValue>); return false; }
                 if (!l2Store.Add(value, out entry)) return false;
-                if (l1Store?.HasCapacity == true)
+                telemetry.AdjustEntries(1);
+                if (l1Store?.HasCapacity == true && l1Store.Add(entry))
                 {
-                    l1Store.Add(entry);
+                    telemetry.AdjustL1Entries(1);
                 }
                 if (!metadata.AddTail(entry.Id)) return false;
                 if (!TryEvict()) return false;
                 return true;
             }
-            finally { Locker.ExitWriteLock(); }
+            finally
+            {
+                Locker.ExitWriteLock();
+                telemetry.RecordOperation("add");
+                telemetry.EndDuration("add", start);
+            }
         }
 
         /// <summary>
@@ -171,10 +194,16 @@ namespace Baubit.Caching
                 if (lowestId != null)
                 {
                     metadata.GetIdsThrough(lowestId.Value, out var ids);
-                    foreach (var id in ids)
+                    var evictedCount = 0;
+                    using (var activity = telemetry.StartActivity("Baubit.Caching.Evict"))
                     {
-                        RemoveInternal(id, out _);
+                        foreach (var id in ids)
+                        {
+                            if (RemoveInternal(id, out _)) evictedCount++;
+                        }
+                        activity?.SetTag("cache.evicted_count", evictedCount);
                     }
+                    telemetry.RecordEviction(evictedCount);
                 }
                 additionsSinceLastEviction = 0;
             }
@@ -184,13 +213,19 @@ namespace Baubit.Caching
         /// <inheritdoc/>
         public bool Update(TId id, TValue value)
         {
+            var start = telemetry.BeginDuration();
             Locker.EnterWriteLock();
             try
             {
                 if (disposedValue) { return false; }
                 return l2Store.Update(id, value) && l1Store == null ? true : l1Store.Update(id, value);
             }
-            finally { Locker.ExitWriteLock(); }
+            finally
+            {
+                Locker.ExitWriteLock();
+                telemetry.RecordOperation("update");
+                telemetry.EndDuration("update", start);
+            }
         }
 
         /// <inheritdoc/>
@@ -215,17 +250,21 @@ namespace Baubit.Caching
         private bool GetEntryOrDefaultInternal(TId? id, out IEntry<TId, TValue> entry)
         {
             entry = default(IEntry<TId, TValue>);
+            telemetry.RecordOperation("get");
             if (id.HasValue && metadata.ContainsKey(id.Value))
             {
                 if (l1Store?.GetEntryOrDefault(id, out entry) == true)
                 {
+                    telemetry.RecordHit("l1");
                     return true;
                 }
                 else if (l2Store.GetEntryOrDefault(id, out entry))
                 {
+                    telemetry.RecordHit("l2");
                     return true;
                 }
             }
+            telemetry.RecordMiss();
             return true;
         }
 
@@ -335,13 +374,21 @@ namespace Baubit.Caching
         private Task<IEntry<TId, TValue>> GetFutureFirstOrDefaultAsyncInternal(CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested) { Task.FromCanceled<IEntry<TId, TValue>>(cancellationToken); }
+            var activity = telemetry.StartActivity("Baubit.Caching.GetNextAsync");
             var currentTailId = metadata.TailId;
             return metadata.GetNextIdAsync(currentTailId, cancellationToken)
                             .ContinueWith(task =>
                             {
-                                if (task.IsCanceled) throw new TaskCanceledException();
-                                GetEntryOrDefault(task.Result, out var nextEntry);
-                                return nextEntry;
+                                try
+                                {
+                                    if (task.IsCanceled) throw new TaskCanceledException();
+                                    GetEntryOrDefault(task.Result, out var nextEntry);
+                                    return nextEntry;
+                                }
+                                finally
+                                {
+                                    activity?.Dispose();
+                                }
                             }, cancellationToken);
         }
 
@@ -359,12 +406,18 @@ namespace Baubit.Caching
         /// <inheritdoc/>
         public bool Remove(TId id, out IEntry<TId, TValue> entry)
         {
+            var start = telemetry.BeginDuration();
             Locker.EnterWriteLock();
             try
             {
                 return RemoveInternal(id, out entry);
             }
-            finally { Locker.ExitWriteLock(); }
+            finally
+            {
+                Locker.ExitWriteLock();
+                telemetry.RecordOperation("remove");
+                telemetry.EndDuration("remove", start);
+            }
         }
 
         /// <summary>
@@ -379,9 +432,11 @@ namespace Baubit.Caching
             if (disposedValue) { entry = default(IEntry<TId, TValue>); return false; }
             entry = null;
             if (!l2Store.Remove(id, out var l2Entry)) return false;
+            telemetry.AdjustEntries(-1);
             if (l1Store?.GetEntryOrDefault(id, out var l1Entry) == true && l1Entry != null)
             {
                 if (!l1Store.Remove(id, out l1Entry)) return false;
+                telemetry.AdjustL1Entries(-1);
             }
             if (!metadata.Remove(id)) return false;
             if (!ReplenishL1Store()) return false;
@@ -397,10 +452,19 @@ namespace Baubit.Caching
         /// <returns><c>true</c> always; the method is best‑effort.</returns>
         protected bool ReplenishL1Store()
         {
+            var replenishedCount = 0;
             while (l1Store?.HasCapacity == true &&
                    metadata.GetNextId(l1Store.LastAddedId, out var nextId) &&
                    l2Store.GetEntryOrDefault(nextId, out var nextEntry) &&
-                   nextEntry != null && l1Store.Add(nextEntry)) ;
+                   nextEntry != null && l1Store.Add(nextEntry))
+            {
+                replenishedCount++;
+            }
+            if (replenishedCount > 0)
+            {
+                telemetry.AdjustL1Entries(replenishedCount);
+                telemetry.RecordReplenishment(replenishedCount);
+            }
             return true;
         }
 
@@ -461,6 +525,7 @@ namespace Baubit.Caching
                 if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
                 var retVal = enumeratorFactory.CreateEnumerator(this, RemoveEnumerator, id, cancellationToken);
                 activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
+                telemetry.AdjustEnumerators(1);
                 return retVal;
             }
             finally
@@ -484,6 +549,7 @@ namespace Baubit.Caching
                 if (!string.IsNullOrEmpty(id) && activeEnumerators.Any(enumerator => enumerator.Id == id)) throw new InvalidOperationException($"Enumerator with id {id} already exists!");
                 var retVal = enumeratorFactory.CreateFutureEnumerator(this, RemoveEnumerator, id, cancellationToken);
                 activeEnumerators.Add(retVal as ICacheEnumerator<TId>);
+                telemetry.AdjustEnumerators(1);
                 return retVal;
             }
             finally
@@ -502,7 +568,10 @@ namespace Baubit.Caching
             enumeratorSemaphore.Wait();
             try
             {
-                activeEnumerators.Remove(enumerator);
+                if (activeEnumerators.Remove(enumerator))
+                {
+                    telemetry.AdjustEnumerators(-1);
+                }
             }
             finally
             {
