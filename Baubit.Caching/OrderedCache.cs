@@ -155,13 +155,14 @@ namespace Baubit.Caching
             {
                 if (disposedValue) { entry = default(IEntry<TId, TValue>); return false; }
                 if (!l2Store.Add(value, out entry)) return false;
+                var addedToL1 = l1Store?.HasCapacity == true && l1Store.Add(entry);
+                if (!metadata.AddTail(entry.Id)) return false;
+                if (!TryEvict()) return false;
                 telemetry.AdjustEntries(1);
-                if (l1Store?.HasCapacity == true && l1Store.Add(entry))
+                if (addedToL1)
                 {
                     telemetry.AdjustL1Entries(1);
                 }
-                if (!metadata.AddTail(entry.Id)) return false;
-                if (!TryEvict()) return false;
                 return true;
             }
             finally
@@ -432,14 +433,19 @@ namespace Baubit.Caching
             if (disposedValue) { entry = default(IEntry<TId, TValue>); return false; }
             entry = null;
             if (!l2Store.Remove(id, out var l2Entry)) return false;
-            telemetry.AdjustEntries(-1);
+            var removedFromL1 = false;
             if (l1Store?.GetEntryOrDefault(id, out var l1Entry) == true && l1Entry != null)
             {
                 if (!l1Store.Remove(id, out l1Entry)) return false;
-                telemetry.AdjustL1Entries(-1);
+                removedFromL1 = true;
             }
             if (!metadata.Remove(id)) return false;
             if (!ReplenishL1Store()) return false;
+            telemetry.AdjustEntries(-1);
+            if (removedFromL1)
+            {
+                telemetry.AdjustL1Entries(-1);
+            }
             entry = l2Entry;
             return true;
         }
