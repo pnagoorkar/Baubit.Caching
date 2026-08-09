@@ -36,15 +36,15 @@
 
   <!-- Use package reference when UseLocalBaubitDependencies is false -->
   <ItemGroup Condition="'$(UseLocalBaubitDependencies)' != 'true'">
-    <PackageReference Include="Baubit.Tasks"/>
-    <PackageReference Include="Baubit.Collections"/>
-    <PackageReference Include="Baubit.Identity"/>
-    <PackageReference Include="Baubit.Configuration"/>
+    <PackageReference Include="Baubit.Tasks" />
+    <PackageReference Include="Baubit.Collections" />
+    <PackageReference Include="Baubit.Identity" />
+    <PackageReference Include="Baubit.Configuration" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces"/>
-    <PackageReference Include="Microsoft.Extensions.Logging"/>
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
 </Project>

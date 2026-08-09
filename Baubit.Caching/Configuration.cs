@@ -6,6 +6,13 @@
     public class Configuration : Baubit.Configuration.Configuration
     {
         /// <summary>
+        /// Gets or sets the optional, stable logical name for this cache (e.g. "users", "products").
+        /// Used exclusively to populate the low-cardinality <c>cache.name</c> telemetry tag.
+        /// When not specified, telemetry measurements omit the <c>cache.name</c> tag entirely;
+        /// no identifier is auto-generated.
+        /// </summary>
+        public string Name { get; set; } = null;
+        /// <summary>
         /// Gets or sets whether adaptive resizing is enabled for the L1 cache store.
         /// When enabled, the cache periodically adjusts L1 capacity based on production rate.
         /// Default is <c>false</c>.
